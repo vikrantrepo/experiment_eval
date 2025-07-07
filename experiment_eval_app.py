@@ -1,19 +1,12 @@
+# streamlit_app.py - cleaned for Streamlit Community Cloud deployment
 import pandas as pd
 import numpy as np
 import streamlit as st
-import subprocess
-import os
-from pathlib import Path
-from webbrowser import open as open_browser
 import altair as alt
 import matplotlib.pyplot as plt
+from pathlib import Path
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.proportion import proportions_ztest
-
-# -------------------- AUTO CLEANUP --------------------
-lock_path = Path(".streamlit_run.lock")
-if lock_path.exists():
-    lock_path.unlink()
 
 # -------------------- DATA LOAD & CLEAN --------------------
 def load_and_clean(path: str) -> pd.DataFrame:
@@ -145,10 +138,7 @@ def show_visuals(df: pd.DataFrame, index_col: str):
             bars = base.mark_bar()
             fmt = ".0f" if col == 'conversion_rate_diff_bps' else (".1%" if col in ['net_aov_rel_diff', 'orders_per_converter_rel_diff'] else ".2f")
             text = base.mark_text(
-                align='center',
-                baseline='bottom',
-                dy=-4,
-                fontSize=12
+                align='center', baseline='bottom', dy=-4, fontSize=12
             ).encode(
                 text=alt.Text(col, format=fmt),
                 color=alt.condition(alt.datum[col] < 0, alt.value("red"), alt.value("green"))
@@ -162,103 +152,59 @@ def main():
     st.title("📊 Experiment Results")
     path = st.file_uploader("Upload CSV", type='csv')
     if not path:
-        st.info("Please your experiment csv file.")
+        st.info("Please upload your experiment CSV file.")
         return
     df = load_and_clean(path)
 
-    # Filters (hidden in expander)
+    # Filters
     with st.expander("🔍 Filter Options", expanded=False):
         shops = sorted(df['shop'].unique())
         devs = sorted(df['device_platform'].unique())
         sel_shops = st.multiselect("Shops", shops, default=shops)
         sel_devs = st.multiselect("Devices", devs, default=devs)
-    df = df[df['shop'].isin(sel_shops) & df['device_platform'].isin(sel_devs)][df['shop'].isin(sel_shops) & df['device_platform'].isin(sel_devs)]
+    df = df[df['shop'].isin(sel_shops) & df['device_platform'].isin(sel_devs)]
 
-    # Grand totals
+    # Overall Metrics
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
     st.table(totals_df)
 
-    # Statistical Tests Summary
+    # Statistical Tests
     obs, p_boot, ci, diffs = bootstrap_rpev(df)
     z, p_z = conversion_z_test(df)
     (u_o, p_o), (u_a, p_a) = mann_whitney_tests(df)
 
     stats_summary = pd.DataFrame([
-        {
-            'Test': 'Revenue per Visitor (Bootstrap)',
-            'Statistic': f"{obs:.4f}",
-            'P-value': p_boot,
-            'CI Lower': ci[0],
-            'CI Upper': ci[1],
-            'Significant': 'Yes' if p_boot < 0.05 else 'No'
-        },
-        {
-            'Test': 'Conversion Rate (Z-test)',
-            'Statistic': f"{z:.4f}",
-            'P-value': p_z,
-            'CI Lower': np.nan,
-            'CI Upper': np.nan,
-            'Significant': 'Yes' if p_z < 0.05 else 'No'
-        },
-        {
-            'Test': 'Orders per Converter (Mann-Whitney)',
-            'Statistic': f"{u_o:.2f}",
-            'P-value': p_o,
-            'CI Lower': np.nan,
-            'CI Upper': np.nan,
-            'Significant': 'Yes' if p_o < 0.05 else 'No'
-        },
-        {
-            'Test': 'Net AOV (Mann-Whitney)',
-            'Statistic': f"{u_a:.2f}",
-            'P-value': p_a,
-            'CI Lower': np.nan,
-            'CI Upper': np.nan,
-            'Significant': 'Yes' if p_a < 0.05 else 'No'
-        }
+        { 'Test': 'Revenue per Visitor (Bootstrap)', 'Statistic': f"{obs:.4f}", 'P-value': p_boot, 'CI Lower': ci[0], 'CI Upper': ci[1], 'Significant': 'Yes' if p_boot < 0.05 else 'No' },
+        { 'Test': 'Conversion Rate (Z-test)', 'Statistic': f"{z:.4f}", 'P-value': p_z, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_z < 0.05 else 'No' },
+        { 'Test': 'Orders per Converter (Mann-Whitney)', 'Statistic': f"{u_o:.2f}", 'P-value': p_o, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_o < 0.05 else 'No' },
+        { 'Test': 'Net AOV (Mann-Whitney)', 'Statistic': f"{u_a:.2f}", 'P-value': p_a, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_a < 0.05 else 'No' }
     ])
 
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'))
 
-    # Visuals and detailed tests
+    # Bootstrap Distribution
     fig, ax = plt.subplots()
     ax.hist(diffs, bins=50, alpha=0.7)
-    ax.axvline(obs, color='red', linestyle='--')
-    ax.axvline(ci[0], color='gray', linestyle=':')
-    ax.axvline(ci[1], color='gray', linestyle=':')
+    ax.axvline(obs, linestyle='--')
+    ax.axvline(ci[0], linestyle=':')
+    ax.axvline(ci[1], linestyle=':')
     st.pyplot(fig)
 
-    # Level metrics
+    # Level Metrics
     shop_metrics = compute_bucket_metrics_by_level(df, 'shop')
     device_metrics = compute_bucket_metrics_by_level(df, 'device_platform')
     shop_pivot = pivot_metrics(shop_metrics, 'shop').sort_values('total_visitors_Test', ascending=False)
     device_pivot = pivot_metrics(device_metrics, 'device_platform').sort_values('total_visitors_Test', ascending=False)
 
-    # Shop-Level Table
+    # Shop-Level Metrics
     st.subheader("🛒 Shop-Level Metrics")
-    st.dataframe(
-        shop_pivot.style.format({
-            'conversion_rate_diff_bps': '{:.0f}',
-            'net_aov_rel_diff': '{:.1%}',
-            'orders_per_converter_rel_diff': '{:.1%}',
-            'net_sales_per_visitor_abs_diff': '{:.2f}'
-        }),
-        use_container_width=True
-    )
+    st.dataframe(shop_pivot, use_container_width=True)
 
-    # Device-Level Table
+    # Device-Level Metrics
     st.subheader("📱 Device-Level Metrics")
-    st.dataframe(
-        device_pivot.style.format({
-            'conversion_rate_diff_bps': '{:.0f}',
-            'net_aov_rel_diff': '{:.1%}',
-            'orders_per_converter_rel_diff': '{:.1%}',
-            'net_sales_per_visitor_abs_diff': '{:.2f}'
-        }),
-        use_container_width=True
-    )
+    st.dataframe(device_pivot, use_container_width=True)
 
     # Visuals
     col1, col2 = st.columns(2)
@@ -270,10 +216,4 @@ def main():
         show_visuals(device_pivot, 'device_platform')
 
 if __name__ == "__main__":
-    if os.getenv("STREAMLIT_SERVER_PORT") or os.getenv("RUN_FROM_STREAMLIT") == "1":
-        main()
-    else:
-        lock_path.write_text("running")
-        env = os.environ.copy()
-        env["RUN_FROM_STREAMLIT"] = "1"
-        subprocess.Popen(["streamlit","run",os.path.abspath(__file__)], env=env)
+    main()
