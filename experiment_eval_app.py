@@ -69,7 +69,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     df = metrics_df.set_index([index_col, 'buckets']).unstack('buckets')
     df.columns = [f"{metric}_{bucket}" for metric, bucket in df.columns]
     df = df.reset_index()
-    df['conversion_rate_diff_bps'] = (df['conversion_rate_Test'] - df['conversion_rate_Control']) * 10000
+    df['conversion_rate_diff_bps'] = (df['conversion_rate_Test'] - df['conversion_rate_Control']) * 100
     df['net_aov_rel_diff'] = ((df['net_aov_Test'] - df['net_aov_Control']) / df['net_aov_Control']).replace([np.inf, -np.inf], np.nan)
     df['orders_per_converter_rel_diff'] = ((df['orders_per_converting_visitor_Test'] - df['orders_per_converting_visitor_Control']) / df['orders_per_converting_visitor_Control']).replace([np.inf, -np.inf], np.nan)
     df['net_sales_per_visitor_abs_diff'] = df['net_sales_per_visitor_Test'] - df['net_sales_per_visitor_Control']
