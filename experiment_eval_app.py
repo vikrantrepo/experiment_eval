@@ -189,6 +189,34 @@ def main():
         sel_devs = st.multiselect("Devices", devs, default=devs)
     df = df[df['shop'].isin(sel_shops) & df['device_platform'].isin(sel_devs)]
 
+    # -------------------- OUTLIER REMOVAL --------------------
+    # Calculate visitor-level metrics to identify outliers beyond 99.9th percentile
+    df_lo_overall = df[df['order_status'].isin(['L', 'O'])]
+    visitor_stats_all = df_lo_overall.groupby('exposed_visitor_id').agg(
+        total_sales=('net_sales', 'sum'),
+        order_count=('order_id', 'nunique')
+    ).assign(
+        net_aov=lambda x: x.total_sales / x.order_count,
+        orders_per_converted=lambda x: x.order_count
+    )
+    # Compute 99.9th percentile thresholds
+    aov_cutoff = visitor_stats_all['net_aov'].quantile(0.999)
+    opc_cutoff = visitor_stats_all['orders_per_converted'].quantile(0.999)
+    # Identify outlier visitor IDs
+    outlier_ids = visitor_stats_all.loc[
+        (visitor_stats_all['net_aov'] > aov_cutoff) |
+        (visitor_stats_all['orders_per_converted'] > opc_cutoff)
+    ].index
+    # Exclude all records of these outlier visitors
+    df = df[~df['exposed_visitor_id'].isin(outlier_ids)]
+
+    # -------------------- END OUTLIER REMOVAL --------------------
+    # Display number of excluded visitors by bucket
+    # Determine which bucket each outlier belonged to in original data
+    outlier_buckets = df_lo_overall[df_lo_overall['exposed_visitor_id'].isin(outlier_ids)][['exposed_visitor_id','buckets']].drop_duplicates()
+    excluded_counts = outlier_buckets.groupby('buckets')['exposed_visitor_id'].nunique().reindex(['Control','Test'], fill_value=0)
+    st.write(f"**Excluded Visitors:** Control: {excluded_counts.loc['Control']}, Test: {excluded_counts.loc['Test']} (all visitors above 99.9th percentile in AOV or orders per converter)")
+
     # Overall Metrics
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
