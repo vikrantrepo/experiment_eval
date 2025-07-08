@@ -247,8 +247,22 @@ def main():
     styled = totals_with_diff.style
     for metric in color_metrics:
         styled = styled.apply(highlight_metric, subset=[metric], axis=0)
+    # Formatting for Control/Test rows
+    fmt_dict = {
+        'total_visitors': '{:,.0f}',
+        'converting_visitors': '{:,.0f}',
+        'orders_all': '{:,.0f}',
+        'orders_L_O': '{:,.0f}',
+        'total_net_sales': '€{:,.0f}',
+        'conversion_rate': '{:.2%}',
+        'net_aov': '€{:.2f}',
+        'orders_per_converting_visitor': '{:.4f}',
+        'share_of_cancelled_orders': '{:.2%}',
+        'net_sales_per_visitor': '€{:.2f}'
+    }
+    styled = styled.format(fmt_dict)
     # Display styled dataframe
-    st.dataframe(styled, use_container_width=True)
+    st.dataframe(styled, use_container_width=True)(styled, use_container_width=True)
 
     # Statistical Tests
     obs, p_boot, ci_boot, diffs = bootstrap_rpev(df)
