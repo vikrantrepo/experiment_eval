@@ -139,7 +139,7 @@ def show_visuals(df: pd.DataFrame, index_col: str):
         if col in sorted_df.columns:
             st.write(f"**{col.replace('_', ' ').title()}**")
             base = alt.Chart(sorted_df).encode(
-                x=alt.X(index_col, sort=list(sorted_df[index_col])),
+                x=alt.X(index_col, sort=list(sorted_df[index_col]), axis=alt.Axis(labelAngle=-45)),
                 y=alt.Y(col, title=col.replace('_', ' ').title()),
                 tooltip=[index_col, col]
             )
@@ -151,7 +151,7 @@ def show_visuals(df: pd.DataFrame, index_col: str):
                 text=alt.Text(col, format=fmt),
                 color=alt.condition(alt.datum[col] < 0, alt.value("red"), alt.value("green"))
             )
-            chart = (bars + text).properties(width=400, height=300)
+            chart = (bars + text).properties(height=300)
             st.altair_chart(chart, use_container_width=True)
 
 # -------------------- MAIN APP --------------------
@@ -175,7 +175,6 @@ def main():
     # Overall Metrics
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
-    # Color-code key metrics
     color_metrics = ['conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor']
     styled = totals_df.style \
         .highlight_max(axis=0, subset=color_metrics, color='lightgreen') \
@@ -199,7 +198,6 @@ def main():
 
     # Distribution & Boxplots
     st.subheader("📈 Distribution and Boxplots")
-    # Prepare visitor-level metrics for boxplots
     df_lo = df[df['order_status'].isin(['L', 'O'])]
     visitor_stats = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
         total_sales=('net_sales', 'sum'),
