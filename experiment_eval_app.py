@@ -236,16 +236,18 @@ def main():
     contr_opc = cr_c * delta_opc * aov_c * total_vis_test
     contr_aov = cr_c * opc_c * delta_aov * total_vis_test
 
-    # Insight
-    primary = None
-    worst = min(contr_cr, contr_opc, contr_aov)
-    if worst == contr_cr:
-        primary = 'Conversion Rate'
-    elif worst == contr_opc:
-        primary = 'Orders per Converted Visitor'
+        # Insight: dynamic primary contributor based on sign of impact
+    contributors = {
+        'Conversion Rate': contr_cr,
+        'Orders per Converted Visitor': contr_opc,
+        'Net AOV': contr_aov
+    }
+    if net_sales_impact >= 0:
+        primary = max(contributors, key=lambda k: contributors[k])
     else:
-        primary = 'Net AOV'
-    st.write(f"**Insight:** Overall net sales impact is {'negative' if net_sales_impact < 0 else 'positive'} ({net_sales_impact:.2f}). The primary contributor is {primary}.")
+        primary = min(contributors, key=lambda k: contributors[k])
+    sign = 'positive' if net_sales_impact >= 0 else 'negative'
+    st.write(f"**Insight:** Overall net sales impact is {sign} ({net_sales_impact:.2f}). The primary contributor is {primary}.")
 
     # Add impact column to summary
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
