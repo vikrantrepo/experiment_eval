@@ -1,4 +1,3 @@
-# streamlit_app.py - cleaned for Streamlit Community Cloud deployment
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -7,6 +6,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.proportion import proportions_ztest
+from scipy.stats import norm  # Added for CI calculation
 
 # -------------------- DATA LOAD & CLEAN --------------------
 def load_and_clean(path: str) -> pd.DataFrame:
@@ -98,13 +98,21 @@ def bootstrap_rpev(df: pd.DataFrame, n_iters=1000, seed=42):
     ci = np.percentile(diffs, [2.5, 97.5])
     return obs, p_val, ci, diffs
 
-def conversion_z_test(df: pd.DataFrame):
+def conversion_z_test(df: pd.DataFrame, alpha=0.05):
     df['converted'] = df['order_id'] > 0
     summary = df.groupby('buckets')['converted'].agg(['sum', 'count'])
-    count = np.array([summary.loc['Test', 'sum'], summary.loc['Control', 'sum']])
+    successes = np.array([summary.loc['Test', 'sum'], summary.loc['Control', 'sum']])
     nobs = np.array([summary.loc['Test', 'count'], summary.loc['Control', 'count']])
-    z, p = proportions_ztest(count, nobs)
-    return z, p
+    p1 = successes[0] / nobs[0]
+    p2 = successes[1] / nobs[1]
+    diff = p1 - p2
+    p_pool = successes.sum() / nobs.sum()
+    se = np.sqrt(p_pool * (1 - p_pool) * (1/nobs[0] + 1/nobs[1]))
+    z = diff / se
+    _, p = proportions_ztest(successes, nobs)
+    z_alpha = norm.ppf(1 - alpha/2)
+    ci = (diff - z_alpha * se, diff + z_alpha * se)
+    return z, p, ci
 
 def mann_whitney_tests(df: pd.DataFrame):
     df_lo = df[df['order_status'].isin(['L', 'O'])]
@@ -167,16 +175,21 @@ def main():
     # Overall Metrics
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
-    st.table(totals_df)
+    # Color-code key metrics
+    color_metrics = ['conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor']
+    styled = totals_df.style \
+        .highlight_max(axis=0, subset=color_metrics, color='lightgreen') \
+        .highlight_min(axis=0, subset=color_metrics, color='salmon')
+    st.dataframe(styled, use_container_width=True)
 
     # Statistical Tests
-    obs, p_boot, ci, diffs = bootstrap_rpev(df)
-    z, p_z = conversion_z_test(df)
+    obs, p_boot, ci_boot, diffs = bootstrap_rpev(df)
+    z, p_z, ci_z = conversion_z_test(df)
     (u_o, p_o), (u_a, p_a) = mann_whitney_tests(df)
 
     stats_summary = pd.DataFrame([
-        { 'Test': 'Revenue per Visitor (Bootstrap)', 'Statistic': f"{obs:.4f}", 'P-value': p_boot, 'CI Lower': ci[0], 'CI Upper': ci[1], 'Significant': 'Yes' if p_boot < 0.05 else 'No' },
-        { 'Test': 'Conversion Rate (Z-test)', 'Statistic': f"{z:.4f}", 'P-value': p_z, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_z < 0.05 else 'No' },
+        { 'Test': 'Revenue per Visitor (Bootstrap)', 'Statistic': f"{obs:.4f}", 'P-value': p_boot, 'CI Lower': ci_boot[0], 'CI Upper': ci_boot[1], 'Significant': 'Yes' if p_boot < 0.05 else 'No' },
+        { 'Test': 'Conversion Rate (Z-test)', 'Statistic': f"{z:.4f}", 'P-value': p_z, 'CI Lower': ci_z[0], 'CI Upper': ci_z[1], 'Significant': 'Yes' if p_z < 0.05 else 'No' },
         { 'Test': 'Orders per Converter (Mann-Whitney)', 'Statistic': f"{u_o:.2f}", 'P-value': p_o, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_o < 0.05 else 'No' },
         { 'Test': 'Net AOV (Mann-Whitney)', 'Statistic': f"{u_a:.2f}", 'P-value': p_a, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_a < 0.05 else 'No' }
     ])
@@ -184,13 +197,43 @@ def main():
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'))
 
-    # Bootstrap Distribution
-    fig, ax = plt.subplots()
-    ax.hist(diffs, bins=50, alpha=0.7)
-    ax.axvline(obs, linestyle='--')
-    ax.axvline(ci[0], linestyle=':')
-    ax.axvline(ci[1], linestyle=':')
-    st.pyplot(fig)
+    # Distribution & Boxplots
+    st.subheader("📈 Distribution and Boxplots")
+    # Prepare visitor-level metrics for boxplots
+    df_lo = df[df['order_status'].isin(['L', 'O'])]
+    visitor_stats = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
+        total_sales=('net_sales', 'sum'),
+        order_count=('order_id', 'nunique')
+    ).assign(
+        net_aov=lambda x: x.total_sales / x.order_count,
+        orders_per_converted=lambda x: x.order_count
+    ).reset_index()
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        fig1, ax1 = plt.subplots(figsize=(4, 3))
+        ax1.hist(diffs, bins=50, alpha=0.7)
+        ax1.axvline(obs, linestyle='--')
+        ax1.axvline(ci_boot[0], linestyle=':')
+        ax1.axvline(ci_boot[1], linestyle=':')
+        ax1.set_title('Bootstrap Distribution')
+        st.pyplot(fig1)
+    with col2:
+        fig2, ax2 = plt.subplots(figsize=(4, 3))
+        visitor_stats.boxplot(column='net_aov', by='buckets', ax=ax2)
+        ax2.set_title('Net AOV by Bucket')
+        ax2.set_xlabel('')
+        ax2.set_ylabel('Net AOV')
+        plt.suptitle('')
+        st.pyplot(fig2)
+    with col3:
+        fig3, ax3 = plt.subplots(figsize=(4, 3))
+        visitor_stats.boxplot(column='order_count', by='buckets', ax=ax3)
+        ax3.set_title('Orders per Converted Visitor')
+        ax3.set_xlabel('')
+        ax3.set_ylabel('Orders per Visitor')
+        plt.suptitle('')
+        st.pyplot(fig3)
 
     # Level Metrics
     shop_metrics = compute_bucket_metrics_by_level(df, 'shop')
