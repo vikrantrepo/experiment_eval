@@ -254,6 +254,17 @@ def main():
         'orders_all': '{:,.0f}',
         'orders_L_O': '{:,.0f}',
         'total_net_sales': '€{:,.0f}',
+        # conversion_rate: percent for Control/Test, bps notation for diff
+        'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'net_aov': '€{:.2f}',
+        'orders_per_converting_visitor': '{:.4f}',
+        'share_of_cancelled_orders': '{:.2%}',
+        'net_sales_per_visitor': '€{:.2f}'
+    }',
+        'converting_visitors': '{:,.0f}',
+        'orders_all': '{:,.0f}',
+        'orders_L_O': '{:,.0f}',
+        'total_net_sales': '€{:,.0f}',
         'conversion_rate': '{:.2%}',
         'net_aov': '€{:.2f}',
         'orders_per_converting_visitor': '{:.4f}',
