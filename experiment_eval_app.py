@@ -270,31 +270,21 @@ def main():
         show_visuals(device_pivot, 'device_platform')
 
 
-    # -------------------- COMBINED SHOP+DEVICE SEGMENTS --------------------
-    # Build combined segment identifier
+        # Combined Shop+Device Metrics
     df['segment'] = df['shop'] + ' | ' + df['device_platform']
-    comb_records = []
-    for (seg, bucket), grp in df.groupby(['segment', 'buckets']):
-        total_visitors = grp['exposed_visitor_id'].nunique()
-        sales_sum = grp['net_sales'].sum()
-        nspv = sales_sum / total_visitors if total_visitors else 0
-        comb_records.append({'segment': seg, 'bucket': bucket,
-                              'total_visitors': total_visitors, 'nspv': nspv})
-    comb_df = pd.DataFrame(comb_records)
-    pivot_comb = comb_df.pivot(index='segment', columns='bucket', values=['total_visitors', 'nspv'])
-    pivot_comb.columns = [f"{metric}_{bucket}" for metric, bucket in pivot_comb.columns]
-    pivot_comb = pivot_comb.reset_index()
-    pivot_comb['nspv_diff'] = pivot_comb['nspv_Test'] - pivot_comb['nspv_Control']
-    pivot_comb['impact'] = pivot_comb['nspv_diff'] * pivot_comb['total_visitors_Test']
-    # Top 3 positive & negative
-    top3_comb = pivot_comb.nlargest(3, 'impact')
-    worst3_comb = pivot_comb.nsmallest(3, 'impact')
+    combined_metrics = compute_bucket_metrics_by_level(df, 'segment')
+    combined_pivot = pivot_metrics(combined_metrics, 'segment').sort_values('total_visitors_Test', ascending=False)
+    st.subheader("🔀 Combined Shop+Device Metrics")
+    st.dataframe(
+        combined_pivot.style.format({
+            'conversion_rate_diff_bps': '{:.0f}',
+            'net_aov_rel_diff': '{:.1%}',
+            'orders_per_converter_rel_diff': '{:.1%}',
+            'net_sales_per_visitor_abs_diff': '{:.2f}'
+        }),
+        use_container_width=True
+    )
 
-    st.subheader("🔀 Combined Shop+Device Segments Impact")
-    st.markdown("**Top 3 Positive Segments**")
-    st.table(top3_comb[['segment', 'total_visitors_Test', 'nspv_Control', 'nspv_Test', 'nspv_diff', 'impact']])
-    st.markdown("**Top 3 Negative Segments**")
-    st.table(worst3_comb[['segment', 'total_visitors_Test', 'nspv_Control', 'nspv_Test', 'nspv_diff', 'impact']])
     # -------------------- SEGMENT IMPACT & CONTRIBUTIONS --------------------
     # Compute contributions for shops, devices, and combined segments
     def compute_segment_contrib(data, level):
@@ -396,16 +386,5 @@ def main():
     contribs = {'Conversion': abs(contrib_conv), 'AOV': abs(contrib_aov), 'Orders per converted visitor': abs(contrib_ord)}
     main_global = max(contribs, key=contribs.get)
     insights.append(f"Overall, net sales per visitor changed by {overall_diff:.2f}. Contributions: Conversion={contrib_conv:.2f}, AOV={contrib_aov:.2f}, Orders={contrib_ord:.2f}. Main driver: {main_global}.")
-    for item in insights:
+        for item in insights:
         st.markdown(f"- {item}")
-        st.markdown(f"- {item}")
-
-if __name__ == "__main__":
-    main()
-    if os.getenv("STREAMLIT_SERVER_PORT") or os.getenv("RUN_FROM_STREAMLIT") == "1":
-        main()
-    else:
-        lock_path.write_text("running")
-        env = os.environ.copy()
-        env["RUN_FROM_STREAMLIT"] = "1"
-        subprocess.Popen(["streamlit","run",os.path.abspath(__file__)], env=env)
