@@ -364,76 +364,39 @@ def main():
     st.markdown("**Worst 3 Combined Segments**")
     st.dataframe(combined_worst[['segment','visitors_Control','visitors_Test','nspv_Control','nspv_Test','impact','total_impact','conv_contrib','aov_contrib','ord_contrib','main_contributor']], use_container_width=True)
 
-    # Insights summary
+        # Insights summary
     st.subheader("💡 Insights Summary")
     insights = []
     # Shop insights
-    insights.append(f"Top shop '{shop_top.iloc[0]['shop']}' added {shop_top.iloc[0]['total_impact']:.0f} in net sales, driven mainly by {shop_top.iloc[0]['main_contributor']}.")
+    insights.append(f"Top shop '{shop_top.iloc[0]['shop']}' added {shop_top.iloc[0]['total_impact']:.0f} in net sales, driven mainly by {shop_top.iloc[0]['main_contributor']}." )
     insights.append(f"Worst shop '{shop_worst.iloc[0]['shop']}' lost {abs(shop_worst.iloc[0]['total_impact']):.0f} in net sales, impacted mainly by {shop_worst.iloc[0]['main_contributor']}.")
     # Device insights
     insights.append(f"Top device '{device_top.iloc[0]['device_platform']}' added {device_top.iloc[0]['total_impact']:.0f}, led by {device_top.iloc[0]['main_contributor']}.")
-    insights.append(f"Worst device '{device_worst.iloc[0]['device_platform']}' change of {device_worst.iloc[0]['total_impact']:.0f}, driven by {device_worst.iloc[0]['main_contributor']}.")
+    insights.append(f"Worst device '{device_worst.iloc[0]['device_platform']}' changed by {device_worst.iloc[0]['total_impact']:.0f}, driven by {device_worst.iloc[0]['main_contributor']}.")
     # Combined insights
     insights.append(f"Segment '{combined_top.iloc[0]['segment']}' saw the highest lift of {combined_top.iloc[0]['total_impact']:.0f}, thanks mostly to {combined_top.iloc[0]['main_contributor']}.")
     insights.append(f"Segment '{combined_worst.iloc[0]['segment']}' experienced the largest drop of {abs(combined_worst.iloc[0]['total_impact']):.0f}, due to {combined_worst.iloc[0]['main_contributor']}.")
-        # Compute dynamic overall insights
-    ctrl_df = df[df['buckets']=='Control']
-    test_df = df[df['buckets']=='Test']
-    visitors_control = ctrl_df['exposed_visitor_id'].nunique()
-    visitors_test = test_df['exposed_visitor_id'].nunique()
-    converters_control = ctrl_df[(ctrl_df['order_id']>0)&ctrl_df['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()
-    converters_test = test_df[(test_df['order_id']>0)&test_df['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()
-    orders_lo_control = ctrl_df[ctrl_df['order_status'].isin(['L','O'])]['order_id'].nunique()
-    orders_lo_test = test_df[test_df['order_status'].isin(['L','O'])]['order_id'].nunique()
-    sales_control = ctrl_df['net_sales'].sum()
-    sales_test = test_df['net_sales'].sum()
-    conv_rate_control = converters_control/visitors_control if visitors_control else 0
-    conv_rate_test = converters_test/visitors_test if visitors_test else 0
-    aov_control = sales_control/orders_lo_control if orders_lo_control else 0
-    aov_test = sales_test/orders_lo_test if orders_lo_test else 0
-    ord_control = orders_lo_control/converters_control if converters_control else 0
-    ord_test = orders_lo_test/converters_test if converters_test else 0
-    diff_conv_global = conv_rate_test - conv_rate_control
-    diff_aov_global = aov_test - aov_control
-    diff_ord_global = ord_test - ord_control
-    conv_contrib_global = diff_conv_global * aov_control * ord_control * visitors_test
-    aov_contrib_global = diff_aov_global * conv_rate_control * ord_control * visitors_test
-    ord_contrib_global = diff_ord_global * conv_rate_control * aov_control * visitors_test
-    contribs = {'Conversion': abs(conv_contrib_global), 'AOV': abs(aov_contrib_global), 'Orders per converted visitor': abs(ord_contrib_global)}
-    main_contrib_global = max(contribs, key=lambda k: contribs[k])
-        # Compute dynamic overall insights
-    ctrl_df = df[df['buckets']=='Control']
-    test_df = df[df['buckets']=='Test']
-    visitors_control = ctrl_df['exposed_visitor_id'].nunique()
-    visitors_test = test_df['exposed_visitor_id'].nunique()
-    sales_control = ctrl_df['net_sales'].sum()
-    sales_test = test_df['net_sales'].sum()
-    overall_impact = (sales_test/visitors_test) - (sales_control/visitors_control) if visitors_control and visitors_test else 0
-    converters_control = ctrl_df[(ctrl_df['order_id']>0)&ctrl_df['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()
-    converters_test = test_df[(test_df['order_id']>0)&test_df['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()
-    orders_lo_control = ctrl_df[ctrl_df['order_status'].isin(['L','O'])]['order_id'].nunique()
-    orders_lo_test = test_df[test_df['order_status'].isin(['L','O'])]['order_id'].nunique()
-    conv_rate_control = converters_control/visitors_control if visitors_control else 0
-    conv_rate_test = converters_test/visitors_test if visitors_test else 0
-    aov_control = sales_control/orders_lo_control if orders_lo_control else 0
-    aov_test = sales_test/orders_lo_test if orders_lo_test else 0
-    ord_control = orders_lo_control/converters_control if converters_control else 0
-    ord_test = orders_lo_test/converters_test if converters_test else 0
-    diff_conv_global = conv_rate_test - conv_rate_control
-    diff_aov_global = aov_test - aov_control
-    diff_ord_global = ord_test - ord_control
-    conv_contrib_global = diff_conv_global * aov_control * ord_control * visitors_test
-    aov_contrib_global = diff_aov_global * conv_rate_control * ord_control * visitors_test
-    ord_contrib_global = diff_ord_global * conv_rate_control * aov_control * visitors_test
-    contribs = {'Conversion': abs(conv_contrib_global), 'AOV': abs(aov_contrib_global), 'Orders per converted visitor': abs(ord_contrib_global)}
-    main_contrib_global = max(contribs, key=lambda k: contribs[k])
-    # Append dynamic overall insight
-    insights.append(
-        f"Overall, the Test variant changed net sales per visitor by {overall_impact:.2f}. "
-        f"Total contributions were: Conversion={conv_contrib_global:.2f}, AOV={aov_contrib_global:.2f}, "
-        f"Orders={ord_contrib_global:.2f}. The main driver was {main_contrib_global}."
-    )
-        for item in insights:
+    # Global dynamic insight
+    ctrl = df[df['buckets']=='Control']
+    test = df[df['buckets']=='Test']
+    v_ctrl, v_test = ctrl['exposed_visitor_id'].nunique(), test['exposed_visitor_id'].nunique()
+    ns_ctrl, ns_test = ctrl['net_sales'].sum(), test['net_sales'].sum()
+    overall_diff = (ns_test/v_test if v_test else 0) - (ns_ctrl/v_ctrl if v_ctrl else 0)
+    # compute global contributions
+    conv_ctrl = ctrl[(ctrl['order_id']>0)&ctrl['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()/v_ctrl if v_ctrl else 0
+    conv_test = test[(test['order_id']>0)&test['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()/v_test if v_test else 0
+    aov_ctrl = ns_ctrl/(ctrl[ctrl['order_status'].isin(['L','O'])]['order_id'].nunique()) if ctrl[ctrl['order_status'].isin(['L','O'])]['order_id'].nunique() else 0
+    aov_test = ns_test/(test[test['order_status'].isin(['L','O'])]['order_id'].nunique()) if test[test['order_status'].isin(['L','O'])]['order_id'].nunique() else 0
+    ord_ctrl = (ctrl[ctrl['order_status'].isin(['L','O'])]['order_id'].nunique()/ctrl[(ctrl['order_id']>0)&ctrl['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()) if ctrl[(ctrl['order_id']>0)&ctrl['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique() else 0
+    ord_test = (test[test['order_status'].isin(['L','O'])]['order_id'].nunique()/test[(test['order_id']>0)&test['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique()) if test[(test['order_id']>0)&test['order_status'].isin(['L','O'])]['exposed_visitor_id'].nunique() else 0
+    diff_conv, diff_aov, diff_ord = conv_test-conv_ctrl, aov_test-aov_ctrl, ord_test-ord_ctrl
+    contrib_conv = diff_conv * aov_ctrl * ord_ctrl * v_test
+    contrib_aov = diff_aov * conv_ctrl * ord_ctrl * v_test
+    contrib_ord = diff_ord * conv_ctrl * aov_ctrl * v_test
+    contribs = {'Conversion': abs(contrib_conv), 'AOV': abs(contrib_aov), 'Orders per converted visitor': abs(contrib_ord)}
+    main_global = max(contribs, key=contribs.get)
+    insights.append(f"Overall, net sales per visitor changed by {overall_diff:.2f}. Contributions: Conversion={contrib_conv:.2f}, AOV={contrib_aov:.2f}, Orders={contrib_ord:.2f}. Main driver: {main_global}.")
+    for item in insights:
         st.markdown(f"- {item}")(f"- {item}"):
         st.markdown(f"- {item}")
 
