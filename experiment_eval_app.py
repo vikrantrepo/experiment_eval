@@ -421,6 +421,16 @@ def main():
         st.subheader("Device Segments")
         st.table(device_imp.set_index('device_platform')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
         st.subheader("Shop & Device Mix Segments")
+        st.table(mix_imp.set_index('shop_device')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]):
+        st.markdown("**Insights Summary:**")
+        for bullet in insights:
+            st.markdown(f"- {bullet}")
+        # Display tables
+        st.subheader("Shop Segments")
+        st.table(shop_imp.set_index('shop')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
+        st.subheader("Device Segments")
+        st.table(device_imp.set_index('device_platform')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
+        st.subheader("Shop & Device Mix Segments")
         st.table(mix_imp.set_index('shop_device')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
     with st.expander("📌 Segment Impact Analysis", expanded=False):
         st.markdown("**Insights Summary:**")
