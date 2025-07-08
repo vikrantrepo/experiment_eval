@@ -142,7 +142,7 @@ def show_visuals(df: pd.DataFrame, index_col: str):
                 x=alt.X(
                     index_col,
                     sort=list(sorted_df[index_col]),
-                    axis=alt.Axis(labelAngle=-45, labelAlign='right')
+                    axis=alt.Axis(labelAngle=-45, labelAlign='right', labelLimit=200)
                 ),
                 y=alt.Y(
                     col,
@@ -192,9 +192,17 @@ def main():
     # Overall Metrics
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
+    # Add absolute difference row for key metrics
+    diff = pd.Series(index=totals_df.columns, name='Absolute Difference')
+    diff['conversion_rate'] = round((totals_df.loc['Test','conversion_rate'] - totals_df.loc['Control','conversion_rate']) * 10000, 0)
+    diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
+    diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
+    diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
+    totals_with_diff = totals_df.append(diff)
+
     # Color-code key metrics
     color_metrics = ['conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor']
-    styled = totals_df.style \
+    styled = totals_with_diff.style \
         .highlight_max(axis=0, subset=color_metrics, color='lightgreen') \
         .highlight_min(axis=0, subset=color_metrics, color='salmon')
     st.dataframe(styled, use_container_width=True)
@@ -204,6 +212,7 @@ def main():
     z, p_z, ci_z = conversion_z_test(df)
     (u_o, p_o), (u_a, p_a) = mann_whitney_tests(df)
 
+    # Prepare summary table
     stats_summary = pd.DataFrame([
         { 'Test': 'Revenue per Visitor (Bootstrap)', 'Statistic': f"{obs:.4f}", 'P-value': p_boot, 'CI Lower': ci_boot[0], 'CI Upper': ci_boot[1], 'Significant': 'Yes' if p_boot < 0.05 else 'No' },
         { 'Test': 'Conversion Rate (Z-test)', 'Statistic': f"{z:.4f}", 'P-value': p_z, 'CI Lower': ci_z[0], 'CI Upper': ci_z[1], 'Significant': 'Yes' if p_z < 0.05 else 'No' },
@@ -211,12 +220,39 @@ def main():
         { 'Test': 'Net AOV (Mann-Whitney)', 'Statistic': f"{u_a:.2f}", 'P-value': p_a, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_a < 0.05 else 'No' }
     ])
 
+    # Calculate net sales impact and component contributions
+    total_vis_test = totals_df.loc['Test','total_visitors']
+    cr_c = totals_df.loc['Control','conversion_rate']
+    opc_c = totals_df.loc['Control','orders_per_converting_visitor']
+    aov_c = totals_df.loc['Control','net_aov']
+    delta_nspv = totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor']
+    delta_cr = totals_df.loc['Test','conversion_rate'] - cr_c
+    delta_opc = totals_df.loc['Test','orders_per_converting_visitor'] - opc_c
+    delta_aov = totals_df.loc['Test','net_aov'] - aov_c
+    net_sales_impact = delta_nspv * total_vis_test
+    contr_cr = delta_cr * opc_c * aov_c * total_vis_test
+    contr_opc = cr_c * delta_opc * aov_c * total_vis_test
+    contr_aov = cr_c * opc_c * delta_aov * total_vis_test
+
+    # Insight
+    primary = None
+    worst = min(contr_cr, contr_opc, contr_aov)
+    if worst == contr_cr:
+        primary = 'Conversion Rate'
+    elif worst == contr_opc:
+        primary = 'Orders per Converted Visitor'
+    else:
+        primary = 'Net AOV'
+    st.write(f"**Insight:** Overall net sales impact is {'negative' if net_sales_impact < 0 else 'positive'} ({net_sales_impact:.2f}). The primary contributor is {primary}.")
+
+    # Add impact column to summary
+    stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
+
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'))
 
     # Distribution & Boxplots
     st.subheader("📈 Distribution and Boxplots")
-    # Prepare visitor-level metrics for boxplots
     df_lo = df[df['order_status'].isin(['L', 'O'])]
     visitor_stats = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
         total_sales=('net_sales', 'sum'),
@@ -260,11 +296,11 @@ def main():
 
     # Shop-Level Metrics
     st.subheader("🛒 Shop-Level Metrics")
-    st.dataframe(shop_pivot, use_container_width=True)
+    st.dataframe(shop_pivot.style.hide_index(), use_container_width=True)
 
     # Device-Level Metrics
     st.subheader("📱 Device-Level Metrics")
-    st.dataframe(device_pivot, use_container_width=True)
+    st.dataframe(device_pivot.style.hide_index(), use_container_width=True)
 
     # Visuals
     col1, col2 = st.columns(2)
