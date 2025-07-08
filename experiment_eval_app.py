@@ -217,20 +217,27 @@ def main():
     excluded_counts = outlier_buckets.groupby('buckets')['exposed_visitor_id'].nunique().reindex(['Control','Test'], fill_value=0)
     st.write(f"**Excluded Visitors:** Control: {excluded_counts.loc['Control']}, Test: {excluded_counts.loc['Test']} (all visitors above 99.9th percentile in AOV or orders per converter)")
 
-    # Overall Metrics
+        # Overall Metrics
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
+
     # Add absolute difference row for key metrics
     diff = pd.Series(index=totals_df.columns, name='Absolute Difference')
-    diff['conversion_rate'] = round((totals_df.loc['Test','conversion_rate'] - totals_df.loc['Control','conversion_rate']) * 10000, 0)
+    # Compute conversion rate difference in basis points (e.g., 84.73% - 83.51% = 12 bps)
+    cr_test = totals_df.loc['Test', 'conversion_rate']
+    cr_ctrl = totals_df.loc['Control', 'conversion_rate']
+    cr_diff_bps = int(round((cr_test - cr_ctrl) * 10000, 0))
+    diff['conversion_rate'] = f"{cr_diff_bps} bps"
+    # Compute other absolute differences
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
     diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
-        # Replace deprecated append() with concat or direct assignment
+    # Assign diff row
     totals_with_diff = totals_df.copy()
     totals_with_diff.loc['Absolute Difference'] = diff
 
     # Color-code key metrics: only Test/Control rows
+: only Test/Control rows: only Test/Control rows
     color_metrics = ['conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor']
     def highlight_metric(col):
         # col is a pandas Series of one metric across rows
@@ -254,11 +261,12 @@ def main():
         'orders_all': '{:,.0f}',
         'orders_L_O': '{:,.0f}',
         'total_net_sales': '€{:,.0f}',
-        'conversion_rate': '{:.2%}',
-        'net_aov': '€{:.2f}',
+        # conversion_rate: percent for Control/Test, and bps notation for diff row remains raw string
+        'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'net_aov': lambda v: f"€{v:.2f}",
         'orders_per_converting_visitor': '{:.4f}',
         'share_of_cancelled_orders': '{:.2%}',
-        'net_sales_per_visitor': '€{:.2f}'
+        'net_sales_per_visitor': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v
     }
     styled = styled.format(fmt_dict)
     # Display styled dataframe
