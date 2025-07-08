@@ -202,12 +202,23 @@ def main():
     totals_with_diff = totals_df.copy()
     totals_with_diff.loc['Absolute Difference'] = diff
 
-    # Color-code key metrics
-    color_metrics = ['conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor']
-    styled = totals_with_diff.style \
-        .highlight_max(axis=0, subset=color_metrics, color='lightgreen') \
-        .highlight_min(axis=0, subset=color_metrics, color='salmon')
-    st.dataframe(styled, use_container_width=True)
+        # Color-code key metrics: only Test/Control rows
+    def highlight_metric(col):
+        # col is a pandas Series of one metric across rows
+        vals = col.loc[['Control','Test']]
+        max_val = vals.max()
+        min_val = vals.min()
+        return [(
+            'background-color: lightgreen' if (idx in ['Control','Test'] and v==max_val)
+            else 'background-color: salmon' if (idx in ['Control','Test'] and v==min_val)
+            else ''
+        ) for idx, v in col.items()]
+
+    # Style only color_metrics columns for Control/Test rows
+    styled = totals_with_diff.style
+    for metric in color_metrics:
+        styled = styled.apply(highlight_metric, subset=[metric], axis=0)
+    st.dataframe(styled, use_container_width=True)(styled, use_container_width=True)
 
     # Statistical Tests
     obs, p_boot, ci_boot, diffs = bootstrap_rpev(df)
