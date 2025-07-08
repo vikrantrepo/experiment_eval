@@ -296,9 +296,15 @@ def main():
     shop_pivot = pivot_metrics(shop_metrics, 'shop').sort_values('total_visitors_Test', ascending=False)
     device_pivot = pivot_metrics(device_metrics, 'device_platform').sort_values('total_visitors_Test', ascending=False)
 
-    # Shop-Level Metrics
+        # Shop-Level Metrics
     st.subheader("🛒 Shop-Level Metrics")
-    st.dataframe(shop_pivot.style.hide_index(), use_container_width=True)
+    # Reset index to remove row numbers column
+    st.dataframe(shop_pivot.reset_index(drop=True), use_container_width=True)
+
+    # Device-Level Metrics
+    st.subheader("📱 Device-Level Metrics")
+    # Reset index to remove row numbers column
+    st.dataframe(device_pivot.reset_index(drop=True), use_container_width=True), use_container_width=True)
 
     # Device-Level Metrics
     st.subheader("📱 Device-Level Metrics")
