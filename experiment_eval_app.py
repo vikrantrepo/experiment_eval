@@ -247,6 +247,20 @@ def main():
     styled = totals_with_diff.style
     for metric in color_metrics:
         styled = styled.apply(highlight_metric, subset=[metric], axis=0)
+    # Formatting for Control/Test rows
+    fmt_dict = {
+        'total_visitors': '{:,.0f}',
+        'converting_visitors': '{:,.0f}',
+        'orders_all': '{:,.0f}',
+        'orders_L_O': '{:,.0f}',
+        'total_net_sales': '€{:,.0f}',
+        'conversion_rate': '{:.2%}',
+        'net_aov': '€{:.2f}',
+        'orders_per_converting_visitor': '{:.4f}',
+        'share_of_cancelled_orders': '{:.2%}',
+        'net_sales_per_visitor': '€{:.2f}'
+    }
+    styled = styled.format(fmt_dict)
     # Display styled dataframe
     st.dataframe(styled, use_container_width=True)
 
@@ -277,7 +291,7 @@ def main():
     contr_opc = cr_c * delta_opc * aov_c * total_vis_test
     contr_aov = cr_c * opc_c * delta_aov * total_vis_test
 
-        # Insight: dynamic primary contributor based on sign of impact
+    # Insight: dynamic primary contributor based on sign of impact
     contributors = {
         'Conversion Rate': contr_cr,
         'Orders per Converted Visitor': contr_opc,
@@ -339,24 +353,7 @@ def main():
     shop_pivot = pivot_metrics(shop_metrics, 'shop').sort_values('total_visitors_Test', ascending=False)
     device_pivot = pivot_metrics(device_metrics, 'device_platform').sort_values('total_visitors_Test', ascending=False)
 
-    # Shop-Level Metrics
-    st.subheader("🛒 Shop-Level Metrics")
-    st.dataframe(shop_pivot.reset_index(drop=True), use_container_width=True)
-
-    # Device-Level Metrics
-    st.subheader("📱 Device-Level Metrics")
-    st.dataframe(device_pivot.reset_index(drop=True), use_container_width=True)
-
-        # Visuals
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("📊 Shop-Level Visuals")
-        show_visuals(shop_pivot, 'shop')
-    with col2:
-        st.subheader("📊 Device-Level Visuals")
-        show_visuals(device_pivot, 'device_platform')
-
-            # -------------------- SEGMENT IMPACT ANALYSIS --------------------
+    # Segment Impact Analysis
     # Helper to compute impact contributions for a pivot table
     def compute_contribs(df, segment_col):
         df = df.copy()
@@ -384,7 +381,6 @@ def main():
         df['main_contributor'] = df.apply(pick_main, axis=1)
         return df
 
-    # Prepare segment contributions
     shop_imp = compute_contribs(shop_pivot, 'shop')
     device_imp = compute_contribs(device_pivot, 'device_platform')
     mix = df.copy()
@@ -393,22 +389,7 @@ def main():
     mix_pivot = pivot_metrics(mix_metrics, 'shop_device').sort_values('total_visitors_Test', ascending=False)
     mix_imp = compute_contribs(mix_pivot, 'shop_device')
 
-    # Build insights from segment impacts
-    insights = []
-    segments = [
-        ('Shop', shop_imp, 'shop'),
-        ('Device', device_imp, 'device_platform'),
-        ('Shop & Device', mix_imp, 'shop_device')
-    ]
-    for name, imp, col in segments:
-        best = imp.nlargest(1, 'net_sales_impact')
-        worst = imp.nsmallest(1, 'net_sales_impact')
-        insights.append(
-            f"**{name}**: Best segment “{best.iloc[0][col]}” with impact {best.iloc[0]['net_sales_impact']:.2f} (main contributor: {best.iloc[0]['main_contributor']}); "
-            f"Worst segment “{worst.iloc[0][col]}” with impact {worst.iloc[0]['net_sales_impact']:.2f} (main contributor: {worst.iloc[0]['main_contributor']})."
-        )
-
-        # Segment Impact Insights summary (always visible)
+    # Segment Impact Insights summary (always visible)
     st.markdown("**Segment Impact Insights:**")
     for bullet in insights:
         st.markdown(f"- {bullet}")
