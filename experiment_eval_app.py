@@ -408,31 +408,31 @@ def main():
             f"Worst segment “{worst.iloc[0][col]}” with impact {worst.iloc[0]['net_sales_impact']:.2f} (main contributor: {worst.iloc[0]['main_contributor']})."
         )
 
-    # Segment Impact Insights summary (always visible)
-st.markdown("**Segment Impact Insights:**")
-for bullet in insights:
-    st.markdown(f"- {bullet}")
+        # Segment Impact Insights summary (always visible)
+    st.markdown("**Segment Impact Insights:**")
+    for bullet in insights:
+        st.markdown(f"- {bullet}")
 
-# Collapsible panel for segment impact tables
-with st.expander("📌 Segment Impact Analysis", expanded=False):
-    # Shop Segments
-    st.subheader("Shop Segments")
-    shop_table = shop_imp.sort_values('net_sales_impact', ascending=False)
-    st.table(
-        shop_table.set_index('shop')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
-    )
-    # Device Segments
-    st.subheader("Device Segments")
-    device_table = device_imp.sort_values('net_sales_impact', ascending=False)
-    st.table(
-        device_table.set_index('device_platform')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
-    )
-    # Shop & Device Mix Segments
-    st.subheader("Shop & Device Mix Segments")
-    mix_table = mix_imp.sort_values('net_sales_impact', ascending=False)
-    st.table(
-        mix_table.set_index('shop_device')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
-    )
+    # Collapsible panel for segment impact tables
+    with st.expander("📌 Segment Impact Analysis", expanded=False):
+        # Shop Segments
+        st.subheader("Shop Segments")
+        shop_table = shop_imp.sort_values('net_sales_impact', ascending=False)
+        st.table(
+            shop_table.set_index('shop')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
+        )
+        # Device Segments
+        st.subheader("Device Segments")
+        device_table = device_imp.sort_values('net_sales_impact', ascending=False)
+        st.table(
+            device_table.set_index('device_platform')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
+        )
+        # Shop & Device Mix Segments
+        st.subheader("Shop & Device Mix Segments")
+        mix_table = mix_imp.sort_values('net_sales_impact', ascending=False)
+        st.table(
+            mix_table.set_index('shop_device')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
+        )
 
 if __name__ == "__main__":
     main()
