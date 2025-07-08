@@ -433,8 +433,8 @@ def main():
         f"Total contributions were: Conversion={conv_contrib_global:.2f}, AOV={aov_contrib_global:.2f}, "
         f"Orders={ord_contrib_global:.2f}. The main driver was {main_contrib_global}."
     )
-    for item in insights:
-        st.markdown(f"- {item}"):
+        for item in insights:
+        st.markdown(f"- {item}")(f"- {item}"):
         st.markdown(f"- {item}")
 
 if __name__ == "__main__":
