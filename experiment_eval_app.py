@@ -411,17 +411,8 @@ def main():
         )
 
     # Single collapsible panel for all segment tables
+        # Single collapsible panel for all segment tables
     with st.expander("📌 Segment Impact Analysis", expanded=False):
-        st.markdown("**Insights Summary:**")
-        for bullet in insights:
-            st.markdown(f"- {bullet}")
-        # Display tables
-        st.subheader("Shop Segments")
-        st.table(shop_imp.set_index('shop')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
-        st.subheader("Device Segments")
-        st.table(device_imp.set_index('device_platform')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
-        st.subheader("Shop & Device Mix Segments")
-        st.table(mix_imp.set_index('shop_device')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]):
         st.markdown("**Insights Summary:**")
         for bullet in insights:
             st.markdown(f"- {bullet}")
@@ -432,17 +423,7 @@ def main():
         st.table(device_imp.set_index('device_platform')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
         st.subheader("Shop & Device Mix Segments")
         st.table(mix_imp.set_index('shop_device')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
-    with st.expander("📌 Segment Impact Analysis", expanded=False):
-        st.markdown("**Insights Summary:**")
-        for bullet in insights:
-            st.markdown(f"- {bullet}")
-        # Display tables
-        st.subheader("Shop Segments")
-        st.table(shop_imp[[shop_imp.columns[0], 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']].set_index(shop_imp.columns[0]))
-        st.subheader("Device Segments")
-        st.table(device_imp[[device_imp.columns[0], 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']].set_index(device_imp.columns[0]))
-        st.subheader("Shop & Device Mix Segments")
-        st.table(mix_imp[[mix_imp.columns[0], 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']].set_index(mix_imp.columns[0]))
 
 if __name__ == "__main__":
+    main()
     main()
