@@ -389,6 +389,21 @@ def main():
     mix_pivot = pivot_metrics(mix_metrics, 'shop_device').sort_values('total_visitors_Test', ascending=False)
     mix_imp = compute_contribs(mix_pivot, 'shop_device')
 
+    # Build insights from segment impacts
+    insights = []
+    segments = [
+        ('Shop', shop_imp, 'shop'),
+        ('Device', device_imp, 'device_platform'),
+        ('Shop & Device', mix_imp, 'shop_device')
+    ]
+    for name, imp, col in segments:
+        best = imp.nlargest(1, 'net_sales_impact')
+        worst = imp.nsmallest(1, 'net_sales_impact')
+        insights.append(
+            f"**{name}**: Best segment “{best.iloc[0][col]}” with impact {best.iloc[0]['net_sales_impact']:.2f} (main contributor: {best.iloc[0]['main_contributor']}); "
+            f"Worst segment “{worst.iloc[0][col]}” with impact {worst.iloc[0]['net_sales_impact']:.2f} (main contributor: {worst.iloc[0]['main_contributor']})."
+        )
+
     # Segment Impact Insights summary (always visible)
     st.markdown("**Segment Impact Insights:**")
     for bullet in insights:
