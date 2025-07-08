@@ -356,48 +356,70 @@ def main():
         st.subheader("📊 Device-Level Visuals")
         show_visuals(device_pivot, 'device_platform')
 
-    # -------------------- SEGMENT IMPACT ANALYSIS --------------------
+            # -------------------- SEGMENT IMPACT ANALYSIS --------------------
     # Helper to compute impact contributions for a pivot table
-    def compute_contribs(df, index_col):
+    def compute_contribs(df, segment_col):
         df = df.copy()
         df['net_sales_impact'] = df['net_sales_per_visitor_abs_diff'] * df[f'total_visitors_Test']
         # baseline control values
         df['cr_c'] = df[f'conversion_rate_Control']
         df['opc_c'] = df[f'orders_per_converting_visitor_Control']
         df['aov_c'] = df[f'net_aov_Control']
+        # deltas
         df['delta_cr'] = df[f'conversion_rate_Test'] - df[f'conversion_rate_Control']
         df['delta_opc'] = df[f'orders_per_converting_visitor_Test'] - df[f'orders_per_converting_visitor_Control']
         df['delta_aov'] = df[f'net_aov_Test'] - df[f'net_aov_Control']
+        # contributions
         df['contr_cr'] = df['delta_cr'] * df['opc_c'] * df['aov_c'] * df[f'total_visitors_Test']
         df['contr_opc'] = df['cr_c'] * df['delta_opc'] * df['aov_c'] * df[f'total_visitors_Test']
         df['contr_aov'] = df['cr_c'] * df['opc_c'] * df['delta_aov'] * df[f'total_visitors_Test']
+        # identify main contributor per row
+        def pick_main(row):
+            contribs = {
+                'Conversion Rate': row['contr_cr'],
+                'Orders per Converted Visitor': row['contr_opc'],
+                'Net AOV': row['contr_aov']
+            }
+            return max(contribs, key=contribs.get) if row['net_sales_impact'] >= 0 else min(contribs, key=contribs.get)
+        df['main_contributor'] = df.apply(pick_main, axis=1)
         return df
 
-    # Shop contributions
+    # Prepare segment contributions
     shop_imp = compute_contribs(shop_pivot, 'shop')
-    # Device contributions
     device_imp = compute_contribs(device_pivot, 'device_platform')
-    # Shop & Device mix contributions
     mix = df.copy()
     mix['shop_device'] = mix['shop'] + ' | ' + mix['device_platform']
     mix_metrics = compute_bucket_metrics_by_level(mix, 'shop_device')
     mix_pivot = pivot_metrics(mix_metrics, 'shop_device').sort_values('total_visitors_Test', ascending=False)
     mix_imp = compute_contribs(mix_pivot, 'shop_device')
 
-    # Function to render best/worst tables
-    def render_tables(imp_df, segment_col, title):
-        sorted_imp = imp_df.sort_values('net_sales_impact', ascending=False)
-        best = sorted_imp.head(3)[[segment_col, 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov']]
-        worst = sorted_imp.tail(3)[[segment_col, 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov']]
-        with st.expander(f"{title} - Top 3 Best", expanded=False):
-            st.table(best.set_index(segment_col))
-        with st.expander(f"{title} - Top 3 Worst", expanded=False):
-            st.table(worst.set_index(segment_col))
+    # Build insights from segment impacts
+    insights = []
+    segments = [
+        ('Shop', shop_imp, 'shop'),
+        ('Device', device_imp, 'device_platform'),
+        ('Shop & Device', mix_imp, 'shop_device')
+    ]
+    for name, imp, col in segments:
+        best = imp.nlargest(1, 'net_sales_impact')
+        worst = imp.nsmallest(1, 'net_sales_impact')
+        insights.append(
+            f"**{name}**: Best segment “{best.iloc[0][col]}” with impact {best.iloc[0]['net_sales_impact']:.2f} (main contributor: {best.iloc[0]['main_contributor']}); "
+            f"Worst segment “{worst.iloc[0][col]}” with impact {worst.iloc[0]['net_sales_impact']:.2f} (main contributor: {worst.iloc[0]['main_contributor']})."
+        )
 
-    # Display six segment tables
-    render_tables(shop_imp, 'shop', 'Shop Segment Impact')
-    render_tables(device_imp, 'device_platform', 'Device Segment Impact')
-    render_tables(mix_imp, 'shop_device', 'Shop & Device Mix Impact')
+    # Single collapsible panel for all segment tables
+    with st.expander("📌 Segment Impact Analysis", expanded=False):
+        st.markdown("**Insights Summary:**")
+        for bullet in insights:
+            st.markdown(f"- {bullet}")
+        # Display all tables inside this panel
+        st.subheader("Shop Segments")
+        st.table(shop_imp.set_index('shop')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
+        st.subheader("Device Segments")
+        st.table(device_imp.set_index('device_platform')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
+        st.subheader("Shop & Device Mix Segments")
+        st.table(mix_imp.set_index('shop_device')[[ 'net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
 
 if __name__ == "__main__":
     main()
