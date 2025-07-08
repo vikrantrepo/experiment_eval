@@ -69,7 +69,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     df = metrics_df.set_index([index_col, 'buckets']).unstack('buckets')
     df.columns = [f"{metric}_{bucket}" for metric, bucket in df.columns]
     df = df.reset_index()
-    df['conversion_rate_diff_bps'] = (df['conversion_rate_Test'] - df['conversion_rate_Control']) * 100
+    df['conversion_rate_diff_bps'] = (df['conversion_rate_Test'] - df['conversion_rate_Control']) * 10000
     df['net_aov_rel_diff'] = ((df['net_aov_Test'] - df['net_aov_Control']) / df['net_aov_Control']).replace([np.inf, -np.inf], np.nan)
     df['orders_per_converter_rel_diff'] = ((df['orders_per_converting_visitor_Test'] - df['orders_per_converting_visitor_Control']) / df['orders_per_converting_visitor_Control']).replace([np.inf, -np.inf], np.nan)
     df['net_sales_per_visitor_abs_diff'] = df['net_sales_per_visitor_Test'] - df['net_sales_per_visitor_Control']
@@ -222,7 +222,7 @@ def main():
     totals_df = get_bucket_totals(df)
     # Add absolute difference row for key metrics
     diff = pd.Series(index=totals_df.columns, name='Absolute Difference')
-    diff['conversion_rate'] = round((totals_df.loc['Test','conversion_rate'] - totals_df.loc['Control','conversion_rate']) * 10000, 0)
+    diff['conversion_rate'] = round((totals_df.loc['Test','conversion_rate'] - totals_df.loc['Control','conversion_rate']) * 100, 0)
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
     diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
