@@ -397,7 +397,7 @@ def main():
     main_global = max(contribs, key=contribs.get)
     insights.append(f"Overall, net sales per visitor changed by {overall_diff:.2f}. Contributions: Conversion={contrib_conv:.2f}, AOV={contrib_aov:.2f}, Orders={contrib_ord:.2f}. Main driver: {main_global}.")
     for item in insights:
-        st.markdown(f"- {item}")(f"- {item}"):
+        st.markdown(f"- {item}")
         st.markdown(f"- {item}")
 
 if __name__ == "__main__":
