@@ -198,11 +198,12 @@ def main():
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
     diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
-    # Replace deprecated append() with concat or direct assignment
+        # Replace deprecated append() with concat or direct assignment
     totals_with_diff = totals_df.copy()
     totals_with_diff.loc['Absolute Difference'] = diff
 
-        # Color-code key metrics: only Test/Control rows
+    # Color-code key metrics: only Test/Control rows
+    color_metrics = ['conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor']
     def highlight_metric(col):
         # col is a pandas Series of one metric across rows
         vals = col.loc[['Control','Test']]
@@ -218,7 +219,8 @@ def main():
     styled = totals_with_diff.style
     for metric in color_metrics:
         styled = styled.apply(highlight_metric, subset=[metric], axis=0)
-    st.dataframe(styled, use_container_width=True)(styled, use_container_width=True)
+    # Display styled dataframe
+    st.dataframe(styled, use_container_width=True)
 
     # Statistical Tests
     obs, p_boot, ci_boot, diffs = bootstrap_rpev(df)
