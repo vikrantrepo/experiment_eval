@@ -271,8 +271,8 @@ def main():
         'orders_per_converting_visitor': '{:.4f}',
         'share_of_cancelled_orders': '{:.2%}',
         'net_sales_per_visitor': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
-        'cm1_per_total_visitors': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
-        'cm2_per_total_visitors': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'cm1_per_total_visitors': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
+        'cm2_per_total_visitors': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
         'cm1_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
         'cm2_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v
     }
