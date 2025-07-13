@@ -32,7 +32,7 @@ def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
     cancels = grp[grp['order_status'] == 'S']['order_id'].nunique()
     denom = orders_all if orders_all > 0 else None
 
-    # New: cm1 and cm2 percentages
+    # CM1 and CM2 metrics
     sum_cm1 = grp['cm1'].sum()
     sum_cm2 = grp['cm2'].sum()
     cm1_per_vis = sum_cm1 / total_visitors if total_visitors else 0
@@ -51,7 +51,6 @@ def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
         'share_of_cancelled_orders': round(cancels/denom, 4) if denom else 0,
         'net_sales_per_visitor': round(sales_sum/total_visitors, 4) if total_visitors else 0,
         'total_net_sales': round(sales_sum, 2),
-        # new metrics
         'cm1_per_total_visitors': cm1_per_vis,
         'cm2_per_total_visitors': cm2_per_vis,
         'cm1_per_total_net_sales': cm1_per_sales,
@@ -59,7 +58,6 @@ def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
     }
 
 # Aggregated bucket metrics
-
 def get_bucket_totals(df: pd.DataFrame) -> pd.DataFrame:
     records = []
     for bucket, grp in df.groupby('buckets'):
@@ -71,7 +69,6 @@ def get_bucket_totals(df: pd.DataFrame) -> pd.DataFrame:
     return totals.reindex(ordered)
 
 # Metrics by level (shop or device)
-
 def compute_bucket_metrics_by_level(df, level):
     records = []
     for (lvl_val, bucket), grp in df.groupby([level, 'buckets']):
@@ -82,7 +79,6 @@ def compute_bucket_metrics_by_level(df, level):
     return pd.DataFrame(records).sort_values([level, 'buckets'])
 
 # Pivot & differences
-
 def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     df = metrics_df.set_index([index_col, 'buckets']).unstack('buckets')
     df.columns = [f"{metric}_{bucket}" for metric, bucket in df.columns]
@@ -116,7 +112,6 @@ def bootstrap_rpev(df: pd.DataFrame, n_iters=10000, seed=42):
     ci = np.percentile(diffs, [2.5, 97.5])
     return obs, p_val, ci, diffs
 
-
 def conversion_z_test(df: pd.DataFrame, alpha=0.05):
     df['converted'] = df['order_id'] > 0
     summary = df.groupby('buckets')['converted'].agg(['sum', 'count'])
@@ -129,7 +124,6 @@ def conversion_z_test(df: pd.DataFrame, alpha=0.05):
     diff = successes[0]/nobs[0] - successes[1]/nobs[1]
     ci = (diff - z_alpha * se, diff + z_alpha * se)
     return diff/se, p, ci
-
 
 def mann_whitney_tests(df: pd.DataFrame):
     df_lo = df[df['order_status'].isin(['L', 'O'])]
@@ -196,6 +190,7 @@ def main():
     if not path:
         st.info("Please upload your experiment CSV file.")
         return
+
     df = load_and_clean(path)
 
     # Filters
@@ -240,9 +235,10 @@ def main():
     for m in ['cm1_per_total_visitors', 'cm2_per_total_visitors', 'cm1_per_total_net_sales', 'cm2_per_total_net_sales']:
         test_v = totals_df.loc['Test', m]
         ctrl_v = totals_df.loc['Control', m]
-        diff[m] = f"{abs(round((test_v - ctrl_v)*100, 2))}%"
+        diff[m] = round((test_v - ctrl_v), 4)
     totals_with_diff = totals_df.copy()
     totals_with_diff.loc['Absolute Difference'] = diff
+
     color_metrics = [
         'conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor',
         'cm1_per_total_visitors', 'cm2_per_total_visitors', 'cm1_per_total_net_sales', 'cm2_per_total_net_sales'
@@ -273,8 +269,8 @@ def main():
         'net_sales_per_visitor': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
         'cm1_per_total_visitors': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
         'cm2_per_total_visitors': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
-        'cm1_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
-        'cm2_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v
+        'cm1_per_total_net_sales': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
+        'cm2_per_total_net_sales': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v
     }
     styled = styled.format(fmt_dict)
     st.dataframe(styled, use_container_width=True)
@@ -318,6 +314,7 @@ def main():
         net_aov=lambda x: x.total_sales / x.order_count,
         orders_per_converted=lambda x: x.order_count
     ).reset_index()
+
     col1, col2, col3 = st.columns(3)
     with col1:
         fig1, ax1 = plt.subplots(figsize=(4, 3))
@@ -375,7 +372,17 @@ def main():
         df['contr_cr'] = df['delta_cr'] * df['opc_c'] * df['aov_c'] * df[f'total_visitors_Test']
         df['contr_opc'] = df['cr_c'] * df['delta_opc'] * df['aov_c'] * df[f'total_visitors_Test']
         df['contr_aov'] = df['cr_c'] * df['opc_c'] * df['delta_aov'] * df[f'total_visitors_Test']
-        df['main_contributor'] = df.apply(lambda row: max({'Conversion Rate': row['contr_cr'], 'Orders per Converted Visitor': row['contr_opc'], 'Net AOV': row['contr_aov']}.items(), key=lambda x: x[1])[0] if row['net_sales_impact'] >= 0 else min({'Conversion Rate': row['contr_cr'], 'Orders per Converted Visitor': row['contr_opc'], 'Net AOV': row['contr_aov']}.items(), key=lambda x: x[1])[0], axis=1)
+        df['main_contributor'] = df.apply(lambda row: max(
+            {'Conversion Rate': row['contr_cr'],
+             'Orders per Converted Visitor': row['contr_opc'],
+             'Net AOV': row['contr_aov']}.items(),
+            key=lambda x: x[1])[0]
+            if row['net_sales_impact'] >= 0 else min(
+            {'Conversion Rate': row['contr_cr'],
+             'Orders per Converted Visitor': row['contr_opc'],
+             'Net AOV': row['contr_aov']}.items(),
+            key=lambda x: x[1])[0],
+            axis=1)
         return df
 
     shop_imp = compute_contribs(shop_pivot, 'shop')
@@ -386,23 +393,16 @@ def main():
     mix_pivot = pivot_metrics(mix_metrics, 'shop_device').sort_values('total_visitors_Test', ascending=False)
     mix_imp = compute_contribs(mix_pivot, 'shop_device')
 
-    insights = []
-    segments = [
-        ('Shop', shop_imp, 'shop'),
-        ('Device', device_imp, 'device_platform'),
-        ('Shop & Device', mix_imp, 'shop_device')
-    ]
-    for name, imp, col in segments:
-        best = imp.nlargest(1, 'net_sales_impact')
-        worst = imp.nsmallest(1, 'net_sales_impact')
-        insights.append(
-            f"**{name}**: Best segment “{best.iloc[0][col]}” with impact {best.iloc[0]['net_sales_impact']:.2f} (main contributor: {best.iloc[0]['main_contributor']}); "
-            f"Worst segment “{worst.iloc[0][col]}” with impact {worst.iloc[0]['net_sales_impact']:.2f} (main contributor: {worst.iloc[0]['main_contributor']})."
-        )
-
     st.markdown("**Segment Impact Insights:**")
-    for bullet in insights:
-        st.markdown(f"- {bullet}")
+    for name, imp_df in [('Shop', shop_imp), ('Device', device_imp), ('Shop & Device', mix_imp)]:
+        best = imp_df.nlargest(1, 'net_sales_impact').iloc[0]
+        worst = imp_df.nsmallest(1, 'net_sales_impact').iloc[0]
+        st.markdown(
+            f"- **{name}**: Best segment “{best[name.lower() + (' | device_platform' if name=='Shop & Device' else '')]}” "
+            f"impact {best['net_sales_impact']:.2f} (contributor: {best['main_contributor']}); "
+            f"Worst segment “{worst[name.lower() + (' | device_platform' if name=='Shop & Device' else '')]}” "
+            f"impact {worst['net_sales_impact']:.2f} (contributor: {worst['main_contributor']})."
+        )
 
     with st.expander("📌 Segment Impact Analysis", expanded=False):
         st.subheader("Shop Segments")
@@ -411,7 +411,6 @@ def main():
         st.table(device_imp.set_index('device_platform')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
         st.subheader("Shop & Device Mix Segments")
         st.table(mix_imp.set_index('shop_device')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
-
 
 if __name__ == "__main__":
     main()
