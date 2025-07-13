@@ -306,7 +306,23 @@ def main():
     contributors = {'Conversion Rate': contr_cr, 'Orders per Converted Visitor': contr_opc, 'Net AOV': contr_aov}
     primary = max(contributors, key=lambda k: contributors[k]) if net_sales_impact >= 0 else min(contributors, key=lambda k: contributors[k])
     sign = 'positive' if net_sales_impact >= 0 else 'negative'
-    st.write(f"**Insight:** Overall net sales impact is {sign} ({net_sales_impact:.2f}). The primary contributor is {primary}.")
+
+    # --- new conditional Insight ---
+    alpha = 0.05
+    if p_boot < alpha:
+        # RPV is significant
+        st.write(f"**Insight:** The difference in **Revenue per Visitor** is statistically significant _(p = {p_boot:.3f})_.")
+        st.write(f"> Overall net-sales impact is **{sign}** (€{net_sales_impact:.2f}) and the primary driver is **{primary}**.")
+    else:
+        # RPV not significant: short paragraph with all key metrics + their p-values
+        st.write(f"**Insight:** Revenue per Visitor difference is _not_ significant _(p = {p_boot:.3f})_. Here’s how all the key metrics compare (Control → Test) and their own significance:")
+        st.markdown(f"- **Revenue / Visitor**: €{totals_df.loc['Control','net_sales_per_visitor']:.2f} → €{totals_df.loc['Test','net_sales_per_visitor']:.2f}  ")
+        st.markdown(f"- **Conversion Rate**: {totals_df.loc['Control','conversion_rate']:.2%} → {totals_df.loc['Test','conversion_rate']:.2%}  _(z-test p = {p_z:.3f})_")
+        st.markdown(f"- **Net AOV**: €{totals_df.loc['Control','net_aov']:.2f} → €{totals_df.loc['Test','net_aov']:.2f}  _(Mann–Whitney p = {p_a:.3f})_")
+        st.markdown(f"- **CM1 / Visitor**: €{totals_df.loc['Control','cm1_per_total_visitors']:.2f} → €{totals_df.loc['Test','cm1_per_total_visitors']:.2f}  _(no test)_")
+        st.markdown(f"- **CM2 / Visitor**: €{totals_df.loc['Control','cm2_per_total_visitors']:.2f} → €{totals_df.loc['Test','cm2_per_total_visitors']:.2f}  _(no test)_")
+        st.markdown(f"- **CM1 / Net Sales**: {totals_df.loc['Control','cm1_per_total_net_sales']:.2%} → {totals_df.loc['Test','cm1_per_total_net_sales']:.2%}  _(no test)_")
+        st.markdown(f"- **CM2 / Net Sales**: {totals_df.loc['Control','cm2_per_total_net_sales']:.2%} → {totals_df.loc['Test','cm2_per_total_net_sales']:.2%}  _(no test)_")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'))
