@@ -309,7 +309,7 @@ def main():
     st.write(f"**Insight:** Overall net sales impact is {sign} ({net_sales_impact:.2f}). The primary contributor is {primary}.")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
     st.subheader("🔬 Statistical Tests Summary")
-    st.table(stats_summary.set_index('Test'))
+    st.table(stats_summary.set_index('Test'), use_container_width=True)
 
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
