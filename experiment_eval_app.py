@@ -11,7 +11,7 @@ from scipy.stats import norm  # Added for CI calculation
 # -------------------- DATA LOAD & CLEAN --------------------
 def load_and_clean(path: str) -> pd.DataFrame:
     df = pd.read_csv(path)
-    required = {'buckets', 'exposed_visitor_id', 'net_sales', 'order_id', 'order_status', 'device_platform', 'shop'}
+    required = {'buckets', 'exposed_visitor_id', 'net_sales', 'order_id', 'order_status', 'device_platform', 'shop', 'cm1', 'cm2'}
     missing = required.difference(df.columns)
     if missing:
         st.error(f"Missing columns: {missing}")
@@ -19,6 +19,7 @@ def load_and_clean(path: str) -> pd.DataFrame:
     df['net_sales'] = df['net_sales'].fillna(0.0)
     df['order_id'] = df['order_id'].fillna(0).astype(int)
     df['order_status'] = df['order_status'].fillna('Unknown').astype(str)
+    df[['cm1', 'cm2']] = df[['cm1', 'cm2']].fillna(0.0)
     return df
 
 # -------------------- METRICS FUNCTIONS --------------------
@@ -30,6 +31,15 @@ def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
     sales_sum = grp['net_sales'].sum()
     cancels = grp[grp['order_status'] == 'S']['order_id'].nunique()
     denom = orders_all if orders_all > 0 else None
+
+    # New: cm1 and cm2 percentages
+    sum_cm1 = grp['cm1'].sum()
+    sum_cm2 = grp['cm2'].sum()
+    cm1_per_vis = sum_cm1 / total_visitors if total_visitors else 0
+    cm2_per_vis = sum_cm2 / total_visitors if total_visitors else 0
+    cm1_per_sales = sum_cm1 / sales_sum if sales_sum else 0
+    cm2_per_sales = sum_cm2 / sales_sum if sales_sum else 0
+
     return {
         'total_visitors': total_visitors,
         'converting_visitors': converters,
@@ -40,10 +50,16 @@ def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
         'orders_per_converting_visitor': round(orders_lo/converters, 4) if converters else 0,
         'share_of_cancelled_orders': round(cancels/denom, 4) if denom else 0,
         'net_sales_per_visitor': round(sales_sum/total_visitors, 4) if total_visitors else 0,
-        'total_net_sales': round(sales_sum, 2)
+        'total_net_sales': round(sales_sum, 2),
+        # new metrics
+        'cm1_per_total_visitors': cm1_per_vis,
+        'cm2_per_total_visitors': cm2_per_vis,
+        'cm1_per_total_net_sales': cm1_per_sales,
+        'cm2_per_total_net_sales': cm2_per_sales
     }
 
 # Aggregated bucket metrics
+
 def get_bucket_totals(df: pd.DataFrame) -> pd.DataFrame:
     records = []
     for bucket, grp in df.groupby('buckets'):
@@ -55,6 +71,7 @@ def get_bucket_totals(df: pd.DataFrame) -> pd.DataFrame:
     return totals.reindex(ordered)
 
 # Metrics by level (shop or device)
+
 def compute_bucket_metrics_by_level(df, level):
     records = []
     for (lvl_val, bucket), grp in df.groupby([level, 'buckets']):
@@ -65,6 +82,7 @@ def compute_bucket_metrics_by_level(df, level):
     return pd.DataFrame(records).sort_values([level, 'buckets'])
 
 # Pivot & differences
+
 def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     df = metrics_df.set_index([index_col, 'buckets']).unstack('buckets')
     df.columns = [f"{metric}_{bucket}" for metric, bucket in df.columns]
@@ -98,21 +116,20 @@ def bootstrap_rpev(df: pd.DataFrame, n_iters=10000, seed=42):
     ci = np.percentile(diffs, [2.5, 97.5])
     return obs, p_val, ci, diffs
 
+
 def conversion_z_test(df: pd.DataFrame, alpha=0.05):
     df['converted'] = df['order_id'] > 0
     summary = df.groupby('buckets')['converted'].agg(['sum', 'count'])
     successes = np.array([summary.loc['Test', 'sum'], summary.loc['Control', 'sum']])
     nobs = np.array([summary.loc['Test', 'count'], summary.loc['Control', 'count']])
-    p1 = successes[0] / nobs[0]
-    p2 = successes[1] / nobs[1]
-    diff = p1 - p2
     p_pool = successes.sum() / nobs.sum()
     se = np.sqrt(p_pool * (1 - p_pool) * (1/nobs[0] + 1/nobs[1]))
-    z = diff / se
     _, p = proportions_ztest(successes, nobs)
     z_alpha = norm.ppf(1 - alpha/2)
+    diff = successes[0]/nobs[0] - successes[1]/nobs[1]
     ci = (diff - z_alpha * se, diff + z_alpha * se)
-    return z, p, ci
+    return diff/se, p, ci
+
 
 def mann_whitney_tests(df: pd.DataFrame):
     df_lo = df[df['order_status'].isin(['L', 'O'])]
@@ -134,7 +151,7 @@ def mann_whitney_tests(df: pd.DataFrame):
 # -------------------- VISUALIZATION HELPERS --------------------
 def show_visuals(df: pd.DataFrame, index_col: str):
     cols = ['conversion_rate_diff_bps', 'net_sales_per_visitor_abs_diff', 'net_aov_rel_diff', 'orders_per_converter_rel_diff']
-    sorted_df = df.sort_values('total_visitors_Test', ascending=False)
+    sorted_df = df.sort_values(f'total_visitors_Test', ascending=False)
     for col in cols:
         if col in sorted_df.columns:
             st.write(f"**{col.replace('_', ' ').title()}**")
@@ -190,7 +207,6 @@ def main():
     df = df[df['shop'].isin(sel_shops) & df['device_platform'].isin(sel_devs)]
 
     # -------------------- OUTLIER REMOVAL --------------------
-    # Calculate visitor-level metrics to identify outliers beyond 99.9th percentile
     df_lo_overall = df[df['order_status'].isin(['L', 'O'])]
     visitor_stats_all = df_lo_overall.groupby('exposed_visitor_id').agg(
         total_sales=('net_sales', 'sum'),
@@ -199,93 +215,80 @@ def main():
         net_aov=lambda x: x.total_sales / x.order_count,
         orders_per_converted=lambda x: x.order_count
     )
-    # Compute 99.9th percentile thresholds
     aov_cutoff = visitor_stats_all['net_aov'].quantile(0.999)
     opc_cutoff = visitor_stats_all['orders_per_converted'].quantile(0.999)
-    # Identify outlier visitor IDs
     outlier_ids = visitor_stats_all.loc[
         (visitor_stats_all['net_aov'] > aov_cutoff) |
         (visitor_stats_all['orders_per_converted'] > opc_cutoff)
     ].index
-    # Exclude all records of these outlier visitors
     df = df[~df['exposed_visitor_id'].isin(outlier_ids)]
 
-    # -------------------- END OUTLIER REMOVAL --------------------
-    # Display number of excluded visitors by bucket
-    # Determine which bucket each outlier belonged to in original data
     outlier_buckets = df_lo_overall[df_lo_overall['exposed_visitor_id'].isin(outlier_ids)][['exposed_visitor_id','buckets']].drop_duplicates()
     excluded_counts = outlier_buckets.groupby('buckets')['exposed_visitor_id'].nunique().reindex(['Control','Test'], fill_value=0)
     st.write(f"**Excluded Visitors:** Control: {excluded_counts.loc['Control']}, Test: {excluded_counts.loc['Test']} (all visitors above 99.9th percentile in AOV or orders per converter)")
 
-        # Overall Metrics
+    # -------------------- OVERALL METRICS --------------------
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
-
-    # Add absolute difference row for key metrics
     diff = pd.Series(index=totals_df.columns, name='Absolute Difference')
-    # Compute conversion rate difference in basis points (e.g., 84.73% - 83.51% = 12 bps)
     cr_test = totals_df.loc['Test', 'conversion_rate']
     cr_ctrl = totals_df.loc['Control', 'conversion_rate']
-    cr_diff_bps = int(round((cr_test - cr_ctrl) * 10000, 0))
-    diff['conversion_rate'] = f"{cr_diff_bps} bps"
-    # Compute other absolute differences
+    diff['conversion_rate'] = f"{int(round((cr_test - cr_ctrl) * 10000, 0))} bps"
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
     diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
-    # Assign diff row
+    for m in ['cm1_per_total_visitors', 'cm2_per_total_visitors', 'cm1_per_total_net_sales', 'cm2_per_total_net_sales']:
+        test_v = totals_df.loc['Test', m]
+        ctrl_v = totals_df.loc['Control', m]
+        diff[m] = f"{abs(round((test_v - ctrl_v)*100, 2))}%"
     totals_with_diff = totals_df.copy()
     totals_with_diff.loc['Absolute Difference'] = diff
-
-    # Color-code key metrics: only Test/Control rows
-
-    color_metrics = ['conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor']
+    color_metrics = [
+        'conversion_rate', 'net_aov', 'orders_per_converting_visitor', 'net_sales_per_visitor',
+        'cm1_per_total_visitors', 'cm2_per_total_visitors', 'cm1_per_total_net_sales', 'cm2_per_total_net_sales'
+    ]
     def highlight_metric(col):
-        # col is a pandas Series of one metric across rows
         vals = col.loc[['Control','Test']]
         max_val = vals.max()
         min_val = vals.min()
-        return [(
-            'background-color: lightgreen' if (idx in ['Control','Test'] and v==max_val)
-            else 'background-color: salmon' if (idx in ['Control','Test'] and v==min_val)
-            else ''
-        ) for idx, v in col.items()]
-
-    # Style only color_metrics columns for Control/Test rows
+        return [
+            ('background-color: lightgreen' if (idx in ['Control','Test'] and v==max_val)
+             else 'background-color: salmon' if (idx in ['Control','Test'] and v==min_val)
+             else '')
+            for idx, v in col.items()
+        ]
     styled = totals_with_diff.style
     for metric in color_metrics:
         styled = styled.apply(highlight_metric, subset=[metric], axis=0)
-    # Formatting for Control/Test rows
     fmt_dict = {
         'total_visitors': '{:,.0f}',
         'converting_visitors': '{:,.0f}',
         'orders_all': '{:,.0f}',
         'orders_L_O': '{:,.0f}',
         'total_net_sales': '€{:,.0f}',
-        # conversion_rate: percent for Control/Test, and bps notation for diff row remains raw string
         'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
         'net_aov': lambda v: f"€{v:.2f}",
         'orders_per_converting_visitor': '{:.4f}',
         'share_of_cancelled_orders': '{:.2%}',
-        'net_sales_per_visitor': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v
+        'net_sales_per_visitor': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
+        'cm1_per_total_visitors': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'cm2_per_total_visitors': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'cm1_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'cm2_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v
     }
     styled = styled.format(fmt_dict)
-    # Display styled dataframe
     st.dataframe(styled, use_container_width=True)
 
-    # Statistical Tests
+    # -------------------- STATISTICAL TESTS & VISUALS --------------------
     obs, p_boot, ci_boot, diffs = bootstrap_rpev(df)
     z, p_z, ci_z = conversion_z_test(df)
     (u_o, p_o), (u_a, p_a) = mann_whitney_tests(df)
-
-    # Prepare summary table
     stats_summary = pd.DataFrame([
         { 'Test': 'Revenue per Visitor (Bootstrap)', 'Statistic': f"{obs:.4f}", 'P-value': p_boot, 'CI Lower': ci_boot[0], 'CI Upper': ci_boot[1], 'Significant': 'Yes' if p_boot < 0.05 else 'No' },
         { 'Test': 'Conversion Rate (Z-test)', 'Statistic': f"{z:.4f}", 'P-value': p_z, 'CI Lower': ci_z[0], 'CI Upper': ci_z[1], 'Significant': 'Yes' if p_z < 0.05 else 'No' },
         { 'Test': 'Orders per Converter (Mann-Whitney)', 'Statistic': f"{u_o:.2f}", 'P-value': p_o, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_o < 0.05 else 'No' },
         { 'Test': 'Net AOV (Mann-Whitney)', 'Statistic': f"{u_a:.2f}", 'P-value': p_a, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_a < 0.05 else 'No' }
     ])
-
-    # Calculate net sales impact and component contributions
     total_vis_test = totals_df.loc['Test','total_visitors']
     cr_c = totals_df.loc['Control','conversion_rate']
     opc_c = totals_df.loc['Control','orders_per_converting_visitor']
@@ -298,27 +301,14 @@ def main():
     contr_cr = delta_cr * opc_c * aov_c * total_vis_test
     contr_opc = cr_c * delta_opc * aov_c * total_vis_test
     contr_aov = cr_c * opc_c * delta_aov * total_vis_test
-
-    # Insight: dynamic primary contributor based on sign of impact
-    contributors = {
-        'Conversion Rate': contr_cr,
-        'Orders per Converted Visitor': contr_opc,
-        'Net AOV': contr_aov
-    }
-    if net_sales_impact >= 0:
-        primary = max(contributors, key=lambda k: contributors[k])
-    else:
-        primary = min(contributors, key=lambda k: contributors[k])
+    contributors = {'Conversion Rate': contr_cr, 'Orders per Converted Visitor': contr_opc, 'Net AOV': contr_aov}
+    primary = max(contributors, key=lambda k: contributors[k]) if net_sales_impact >= 0 else min(contributors, key=lambda k: contributors[k])
     sign = 'positive' if net_sales_impact >= 0 else 'negative'
     st.write(f"**Insight:** Overall net sales impact is {sign} ({net_sales_impact:.2f}). The primary contributor is {primary}.")
-
-    # Add impact column to summary
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
-
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'))
 
-    # Distribution & Boxplots
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
     visitor_stats = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
@@ -328,7 +318,6 @@ def main():
         net_aov=lambda x: x.total_sales / x.order_count,
         orders_per_converted=lambda x: x.order_count
     ).reset_index()
-
     col1, col2, col3 = st.columns(3)
     with col1:
         fig1, ax1 = plt.subplots(figsize=(4, 3))
@@ -355,21 +344,17 @@ def main():
         plt.suptitle('')
         st.pyplot(fig3)
 
-    # Level Metrics
     shop_metrics = compute_bucket_metrics_by_level(df, 'shop')
     device_metrics = compute_bucket_metrics_by_level(df, 'device_platform')
     shop_pivot = pivot_metrics(shop_metrics, 'shop').sort_values('total_visitors_Test', ascending=False)
     device_pivot = pivot_metrics(device_metrics, 'device_platform').sort_values('total_visitors_Test', ascending=False)
 
-        # Shop-Level Metrics
     st.subheader("🛒 Shop-Level Metrics")
     st.dataframe(shop_pivot.reset_index(drop=True), use_container_width=True)
 
-    # Device-Level Metrics
     st.subheader("📱 Device-Level Metrics")
     st.dataframe(device_pivot.reset_index(drop=True), use_container_width=True)
 
-    # Shop & Device Visuals
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("📊 Shop-Level Visuals")
@@ -378,32 +363,19 @@ def main():
         st.subheader("📊 Device-Level Visuals")
         show_visuals(device_pivot, 'device_platform')
 
-    # Segment Impact Analysis
-    # Helper to compute impact contributions for a pivot table
     def compute_contribs(df, segment_col):
         df = df.copy()
         df['net_sales_impact'] = df['net_sales_per_visitor_abs_diff'] * df[f'total_visitors_Test']
-        # baseline control values
         df['cr_c'] = df[f'conversion_rate_Control']
         df['opc_c'] = df[f'orders_per_converting_visitor_Control']
         df['aov_c'] = df[f'net_aov_Control']
-        # deltas
         df['delta_cr'] = df[f'conversion_rate_Test'] - df[f'conversion_rate_Control']
         df['delta_opc'] = df[f'orders_per_converting_visitor_Test'] - df[f'orders_per_converting_visitor_Control']
         df['delta_aov'] = df[f'net_aov_Test'] - df[f'net_aov_Control']
-        # contributions
         df['contr_cr'] = df['delta_cr'] * df['opc_c'] * df['aov_c'] * df[f'total_visitors_Test']
         df['contr_opc'] = df['cr_c'] * df['delta_opc'] * df['aov_c'] * df[f'total_visitors_Test']
         df['contr_aov'] = df['cr_c'] * df['opc_c'] * df['delta_aov'] * df[f'total_visitors_Test']
-        # identify main contributor per row
-        def pick_main(row):
-            contribs = {
-                'Conversion Rate': row['contr_cr'],
-                'Orders per Converted Visitor': row['contr_opc'],
-                'Net AOV': row['contr_aov']
-            }
-            return max(contribs, key=contribs.get) if row['net_sales_impact'] >= 0 else min(contribs, key=contribs.get)
-        df['main_contributor'] = df.apply(pick_main, axis=1)
+        df['main_contributor'] = df.apply(lambda row: max({'Conversion Rate': row['contr_cr'], 'Orders per Converted Visitor': row['contr_opc'], 'Net AOV': row['contr_aov']}.items(), key=lambda x: x[1])[0] if row['net_sales_impact'] >= 0 else min({'Conversion Rate': row['contr_cr'], 'Orders per Converted Visitor': row['contr_opc'], 'Net AOV': row['contr_aov']}.items(), key=lambda x: x[1])[0], axis=1)
         return df
 
     shop_imp = compute_contribs(shop_pivot, 'shop')
@@ -414,7 +386,6 @@ def main():
     mix_pivot = pivot_metrics(mix_metrics, 'shop_device').sort_values('total_visitors_Test', ascending=False)
     mix_imp = compute_contribs(mix_pivot, 'shop_device')
 
-    # Build insights from segment impacts
     insights = []
     segments = [
         ('Shop', shop_imp, 'shop'),
@@ -429,31 +400,18 @@ def main():
             f"Worst segment “{worst.iloc[0][col]}” with impact {worst.iloc[0]['net_sales_impact']:.2f} (main contributor: {worst.iloc[0]['main_contributor']})."
         )
 
-    # Segment Impact Insights summary (always visible)
     st.markdown("**Segment Impact Insights:**")
     for bullet in insights:
         st.markdown(f"- {bullet}")
 
-    # Collapsible panel for segment impact tables
     with st.expander("📌 Segment Impact Analysis", expanded=False):
-        # Shop Segments
         st.subheader("Shop Segments")
-        shop_table = shop_imp.sort_values('net_sales_impact', ascending=False)
-        st.table(
-            shop_table.set_index('shop')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
-        )
-        # Device Segments
+        st.table(shop_imp.set_index('shop')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
         st.subheader("Device Segments")
-        device_table = device_imp.sort_values('net_sales_impact', ascending=False)
-        st.table(
-            device_table.set_index('device_platform')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
-        )
-        # Shop & Device Mix Segments
+        st.table(device_imp.set_index('device_platform')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
         st.subheader("Shop & Device Mix Segments")
-        mix_table = mix_imp.sort_values('net_sales_impact', ascending=False)
-        st.table(
-            mix_table.set_index('shop_device')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']]
-        )
+        st.table(mix_imp.set_index('shop_device')[['net_sales_impact', 'contr_cr', 'contr_opc', 'contr_aov', 'main_contributor']])
+
 
 if __name__ == "__main__":
     main()
