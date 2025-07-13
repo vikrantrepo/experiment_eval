@@ -237,7 +237,9 @@ def main():
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
     diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
-    for m in ['cm1_per_total_visitors', 'cm2_per_total_visitors', 'cm1_per_total_net_sales', 'cm2_per_total_net_sales']:
+    diff['cm1_per_total_visitors'] = round(totals_df.loc['Test','cm1_per_total_visitors'] - totals_df.loc['Control','cm1_per_total_visitors'], 4)
+    diff['cm2_per_total_visitors'] = round(totals_df.loc['Test','cm2_per_total_visitors'] - totals_df.loc['Control','cm2_per_total_visitors'], 4)
+    for m in [ 'cm1_per_total_net_sales', 'cm2_per_total_net_sales']:
         test_v = totals_df.loc['Test', m]
         ctrl_v = totals_df.loc['Control', m]
         diff[m] = f"{abs(round((test_v - ctrl_v)*100, 2))}%"
