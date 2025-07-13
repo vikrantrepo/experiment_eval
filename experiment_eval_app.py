@@ -271,6 +271,22 @@ def main():
         'orders_per_converting_visitor': '{:.4f}',
         'share_of_cancelled_orders': '{:.2%}',
         'net_sales_per_visitor': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
+        # cm1/cm2 formats: raw values with 2 decimals
+        'cm1_per_total_visitors': '{:.2f}',
+        'cm2_per_total_visitors': '{:.2f}',
+        'cm1_per_total_net_sales': '{:.2f}',
+        'cm2_per_total_net_sales': '{:.2f}'
+    }
+        'total_visitors': '{:,.0f}',
+        'converting_visitors': '{:,.0f}',
+        'orders_all': '{:,.0f}',
+        'orders_L_O': '{:,.0f}',
+        'total_net_sales': '€{:,.0f}',
+        'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'net_aov': lambda v: f"€{v:.2f}",
+        'orders_per_converting_visitor': '{:.4f}',
+        'share_of_cancelled_orders': '{:.2%}',
+        'net_sales_per_visitor': lambda v: f"€{v:.2f}" if isinstance(v, (int, float, np.floating)) else v,
         'cm1_per_total_visitors': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
         'cm2_per_total_visitors': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
         'cm1_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
