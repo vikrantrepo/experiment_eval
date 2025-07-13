@@ -314,7 +314,6 @@ def main():
         st.write(f"**Insight:** The difference in **Revenue per Visitor** is statistically significant _(p = {p_boot:.3f})_.")
         st.write(f"> Overall net-sales impact is **{sign}** (€{net_sales_impact:.2f}) and the primary driver is **{primary}**.")
     else:
-        else:
         # RPV not significant: one paragraph with significance flags
         ctrl_nspv = totals_df.loc['Control','net_sales_per_visitor']
         test_nspv = totals_df.loc['Test','net_sales_per_visitor']
