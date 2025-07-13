@@ -305,22 +305,8 @@ def main():
     contr_aov = cr_c * opc_c * delta_aov * total_vis_test
     contributors = {'Conversion Rate': contr_cr, 'Orders per Converted Visitor': contr_opc, 'Net AOV': contr_aov}
     primary = max(contributors, key=lambda k: contributors[k]) if net_sales_impact >= 0 else min(contributors, key=lambda k: contributors[k])
-    if p_boot < 0.05:
-        # Significant RPV
-        st.markdown(
-            f"📈 **Incremental Net Sales Impact:** €{net_sales_impact:,.2f}  \
-             Primary contributor: **{primary}**."
-        )
-    else:
-        # Not significant → summary fallback
-        other_msgs = [
-            f"• Revenue per Visitor change of €{obs:.2f} is not significant (p = {p_boot:.3f}).",
-            f"• Conversion Rate change of {int(cr_diff_bps)} bps is {'significant' if p_z<0.05 else 'not significant'} (p = {p_z:.3f}).",
-            f"• Orders per Converter change of {opc_diff:.3f} is {'significant' if p_o<0.05 else 'not significant'} (p = {p_o:.3f}).",
-            f"• Net AOV change of €{aov_diff:.2f} is {'significant' if p_a<0.05 else 'not significant'} (p = {p_a:.3f})."
-        ]
-        fallback = ("ℹ️ **No statistically significant net sales impact detected.**  \n" + "\n".join(other_msgs))
-        st.markdown(fallback)
+    sign = 'positive' if net_sales_impact >= 0 else 'negative'
+    st.write(f"**Insight:** Overall net sales impact is {sign} ({net_sales_impact:.2f}). The primary contributor is {primary}.")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'), use_container_width=True)
