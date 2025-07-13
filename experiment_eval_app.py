@@ -230,7 +230,7 @@ def main():
     # -------------------- OVERALL METRICS --------------------
     st.subheader("🏁 Overall Metrics by Bucket")
     totals_df = get_bucket_totals(df)
-    diff = pd.Series(index=totals_df.columns, name='Absolute Difference')
+    diff = pd.Series(index=totals_df.columns, name='Ab. Delta')
     cr_test = totals_df.loc['Test', 'conversion_rate']
     cr_ctrl = totals_df.loc['Control', 'conversion_rate']
     diff['conversion_rate'] = f"{int(round((cr_test - cr_ctrl) * 10000, 0))} bps"
