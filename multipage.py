@@ -540,30 +540,48 @@ def main():
         orders_per_converted=lambda x: x.order_count
     ).reset_index()
     col1, col2, col3 = st.columns(3)
-    with col1:
-        fig1, ax1 = plt.subplots(figsize=(4, 3))
-        ax1.hist(diffs, bins=50, alpha=0.7)
-        ax1.axvline(obs, linestyle='--')
-        ax1.axvline(ci_boot[0], linestyle=':')
-        ax1.axvline(ci_boot[1], linestyle=':')
-        ax1.set_title('Bootstrap Distribution')
-        st.pyplot(fig1)
-    with col2:
-        fig2, ax2 = plt.subplots(figsize=(4, 3))
-        visitor_stats.boxplot(column='net_aov', by='buckets', ax=ax2)
-        ax2.set_title('Net AOV by Bucket')
-        ax2.set_xlabel('')
-        ax2.set_ylabel('Net AOV')
-        plt.suptitle('')
-        st.pyplot(fig2)
-    with col3:
-        fig3, ax3 = plt.subplots(figsize=(4, 3))
-        visitor_stats.boxplot(column='order_count', by='buckets', ax=ax3)
-        ax3.set_title('Orders per Converted Visitor')
-        ax3.set_xlabel('')
-        ax3.set_ylabel('Orders per Visitor')
-        plt.suptitle('')
-        st.pyplot(fig3)
+	with col1:
+	    fig1, ax1 = plt.subplots(figsize=(4, 3))
+	    ax1.hist(diffs, bins=50, alpha=0.7)
+	    ax1.axvline(obs, linestyle='--')
+	    ax1.axvline(ci_boot[0], linestyle=':')
+	    ax1.axvline(ci_boot[1], linestyle=':')
+	    ax1.set_title('Bootstrap Distribution')
+	    st.pyplot(fig1)
+	
+	with col2:
+	    fig2, ax2 = plt.subplots(figsize=(4, 3))
+	    # Percentile whiskers, show outliers, log scale
+	    visitor_stats.boxplot(
+	        column='net_aov',
+	        by='buckets',
+	        ax=ax2,
+	        whis=[5, 95],
+	        showfliers=True
+	    )
+	    ax2.set_yscale('log')
+	    ax2.set_title('Net AOV by Bucket (log scale)')
+	    ax2.set_xlabel('')
+	    ax2.set_ylabel('Net AOV (log scale)')
+	    plt.suptitle('')
+	    st.pyplot(fig2)
+	
+	with col3:
+	    fig3, ax3 = plt.subplots(figsize=(4, 3))
+	    visitor_stats.boxplot(
+	        column='order_count',
+	        by='buckets',
+	        ax=ax3,
+	        whis=[5, 95],
+	        showfliers=True
+	    )
+	    ax3.set_yscale('log')
+	    ax3.set_title('Orders per Converted Visitor (log scale)')
+	    ax3.set_xlabel('')
+	    ax3.set_ylabel('Orders per Visitor (log scale)')
+	    plt.suptitle('')
+	    st.pyplot(fig3)
+
 
     shop_metrics = compute_bucket_metrics_by_level(df, 'shop')
     device_metrics = compute_bucket_metrics_by_level(df, 'device_platform')
