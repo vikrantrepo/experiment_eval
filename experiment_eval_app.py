@@ -66,6 +66,12 @@ with tab1:
         query = f"""
 WITH raw_exposures AS (
   SELECT 'Control' AS bucket,
+        a.post_evar59 as shop,
+	    case when a.post_evar42='notApp' and mobile_id=0 then 'Web_desktop'
+	         else case when a.post_evar42='notApp' and mobile_id>0 then 'Web_mobile'
+	             else case when a.post_evar42='android' then 'App_android'
+	                 else case when  a.post_evar42='ios' then 'App_iOS' else 'Undefined' 
+        end end end end as device_platform, 
         concat(post_visid_high, post_visid_low) AS visitor_id,
         MIN(date_time) AS first_exposure_timestamp
   FROM daci_privatespace.adobe_datafeeds a
@@ -76,9 +82,15 @@ WITH raw_exposures AS (
     AND a.post_evar42 IN ({devices})
     {url_filter_a}
     {page_filter_a}
-  GROUP BY 1, 2
+  GROUP BY 1, 2, 3, 4
   UNION ALL
   SELECT 'Test' AS bucket,
+  	b.post_evar59 as shop,
+        case when b.post_evar42='notApp' and mobile_id=0 then 'Web_desktop'
+	         else case when b.post_evar42='notApp' and mobile_id>0 then 'Web_mobile'
+	             else case when b.post_evar42='android' then 'App_android'
+	                 else case when  b.post_evar42='ios' then 'App_iOS' else 'Undefined' 
+        end end end end as device_platform, 
         concat(post_visid_high, post_visid_low) AS visitor_id,
         MIN(date_time) AS first_exposure_timestamp
   FROM daci_privatespace.adobe_datafeeds b
@@ -89,15 +101,15 @@ WITH raw_exposures AS (
     AND b.post_evar42 IN ({devices})
     {url_filter_b}
     {page_filter_b}
-  GROUP BY 1, 2
+  GROUP BY 1, 2, 3, 4
 ),
 multi_bucket_visitors AS (
-  SELECT visitor_id FROM raw_exposures GROUP BY visitor_id HAVING COUNT(DISTINCT bucket) = 1
+	  SELECT visitor_id FROM raw_exposures GROUP BY visitor_id HAVING COUNT(DISTINCT bucket) = 1
 ),
 bucketed_visitors_first_exposure AS (
-  SELECT re.bucket AS buckets, re.visitor_id AS exposed_visitor_id, first_exposure_timestamp
-  FROM raw_exposures re
-  JOIN multi_bucket_visitors mbv ON re.visitor_id = mbv.visitor_id
+	  SELECT re.shop, re.bucket AS buckets, re.device_platform, re.visitor_id AS exposed_visitor_id, first_exposure_timestamp
+	  FROM raw_exposures re
+	  JOIN multi_bucket_visitors mbv ON re.visitor_id = mbv.visitor_id
 ),
 visitor_cid AS (
   SELECT DISTINCT b.visitor_id AS mapped_visitor_id, b.customer_id AS mapped_customer_id
@@ -132,24 +144,27 @@ conversion_summary AS (
         order_id, net_sales, order_status, order_counter, cm1, cm2, nc_order_f, tnc_order_f
   FROM orders_deduped
 )
-SELECT exp.buckets,
-      COUNT(DISTINCT exp.exposed_visitor_id) AS exposed_visitors,
-      COUNT(DISTINCT cs.converted_visitor_id) AS converted_visitors_post_exposure,
-      ROUND(COUNT(DISTINCT cs.converted_visitor_id) * 1.0 / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS converted_visitor_share,
-      ROUND(SUM(cs.net_sales)) AS total_net_sales,
-      ROUND(SUM(cs.net_sales) / COUNT(DISTINCT exp.exposed_visitor_id), 2) AS net_sales_per_exposed_visitor,
-      ROUND(SUM(cs.net_sales) / COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END), 2) AS net_AOV_with_L_O_orders,
-      ROUND(SUM(cs.cm1) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm1_per_exposed_visitor,
-      ROUND(SUM(cs.cm2) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm2_per_exposed_visitor,
-      ROUND(SUM(cs.cm1) / SUM(cs.net_sales), 4) AS cm1_net_sales_share,
-      ROUND(SUM(cs.cm2) / SUM(cs.net_sales), 4) AS cm2_net_sales_share,
-      ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L', 'O') THEN cs.order_id END) * 1.0 / NULLIF(COUNT(DISTINCT cs.converted_visitor_id), 0), 3) AS orders_per_converted_visitor_with_L_O_orders,
-      COUNT(DISTINCT cs.order_id) AS orders,
-      COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END) AS orders_L_O,
-      ROUND(COUNT(DISTINCT CASE WHEN cs.order_status='S' THEN cs.order_id ELSE NULL END)*1.0 / COUNT(DISTINCT cs.order_id),5) AS orders_cancel_rate
+--select distinct shop, buckets, device_platform, DENSE_RANK() OVER (ORDER BY exposed_visitor_id) AS exposed_visitor_id, coalesce(order_id,0) order_id,coalesce(net_sales,0) net_sales, coalesce(cs.cm1,0) as cm1,coalesce(cs.cm2,0)  as cm2,cs.order_status from bucketed_visitors_first_exposure LEFT JOIN conversion_summary cs ON exposed_visitor_id = cs.converted_visitor_id
+SELECT exp.buckets, --exp.shop,exp.buckets, exp.device_platform,
+       COUNT(DISTINCT exp.exposed_visitor_id) AS exposed_visitors,
+       COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.converted_visitor_id ELSE NULL end ) AS converted_visitors_L_O_post_exposure,
+       COUNT(DISTINCT CASE WHEN cs.order_status IN ('L') THEN cs.converted_visitor_id ELSE NULL end ) AS converted_visitors_L_post_exposure,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.converted_visitor_id ELSE NULL end) * 1.0 / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS converted_visitor_share_L_O,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L') THEN cs.converted_visitor_id ELSE NULL end) * 1.0 / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS converted_visitor_share_L,
+       ROUND(SUM(cs.net_sales)) AS total_net_sales,
+       ROUND(SUM(cs.net_sales) / COUNT(DISTINCT exp.exposed_visitor_id), 2) AS net_sales_per_exposed_visitor,
+       ROUND(SUM(cs.net_sales) / COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END), 2) AS net_AOV_with_L_O_orders,
+       ROUND(SUM(cs.cm1) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm1_per_exposed_visitor,
+       ROUND(SUM(cs.cm2) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm2_per_exposed_visitor,
+       ROUND(SUM(cs.cm1) / SUM(cs.net_sales), 4) AS cm1_net_sales_share,
+       ROUND(SUM(cs.cm2) / SUM(cs.net_sales), 4) AS cm2_net_sales_share,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L', 'O') THEN cs.order_id END) * 1.0 / NULLIF(COUNT(DISTINCT cs.converted_visitor_id), 0), 3) AS orders_per_converted_visitor_with_L_O_orders,
+       COUNT(DISTINCT cs.order_id) AS orders,
+       COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END) AS orders_L_O,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status='S' THEN cs.order_id ELSE NULL END)*1.0 / COUNT(DISTINCT cs.order_id),5) AS orders_cancel_rate
 FROM bucketed_visitors_first_exposure exp
 LEFT JOIN conversion_summary cs ON exp.exposed_visitor_id = cs.converted_visitor_id
-GROUP BY 1
+GROUP BY 1--,2,3
 ORDER BY 1
 """.strip()
         return query
