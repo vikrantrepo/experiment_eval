@@ -340,7 +340,7 @@ def show_visuals(df: pd.DataFrame, index_col: str):
                 x=alt.X(
                     index_col,
                     sort=list(sorted_df[index_col]),
-                    axis=alt.Axis(labelAngle=-45, labelAlign='right', labelLimit=200)
+                    axis=alt.Axis(labelAngle=-90, labelAlign='right', labelLimit=200)
                 ),
                 y=alt.Y(
                     col,
