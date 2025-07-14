@@ -132,6 +132,7 @@ conversion_summary AS (
         order_id, net_sales, order_status, order_counter, cm1, cm2, nc_order_f, tnc_order_f
   FROM orders_deduped
 )
+--select distinct buckets,exposed_visitor_id, coalesce(order_id,0) order_id,coalesce(net_sales,0) net_sales, cs.order_status  from bucketed_visitors_first_exposure LEFT JOIN conversion_summary cs ON exposed_visitor_id = cs.converted_visitor_id
 SELECT exp.buckets,
       COUNT(DISTINCT exp.exposed_visitor_id) AS exposed_visitors,
       COUNT(DISTINCT cs.converted_visitor_id) AS converted_visitors_post_exposure,
