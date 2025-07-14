@@ -146,7 +146,7 @@ ORDER BY 1
 
 st.subheader("Generated SQL Query")
 sql_code = build_sql()
-st.code(sql_code, language="sql")
+#st.code(sql_code, language="sql")
 
 # -------------------- Copy to Clipboard --------------------
 
