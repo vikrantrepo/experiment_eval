@@ -1,21 +1,10 @@
 import streamlit as st
 import datetime
-import pandas as pd
-import numpy as np
-import altair as alt
-import matplotlib.pyplot as plt
-from pathlib import Path
-from scipy.stats import mannwhitneyu
-from statsmodels.stats.proportion import proportions_ztest
-from scipy.stats import norm
 
-# Define two tabs
-tab1, tab2 = st.tabs(["SQL Query Builder", "Experiment Dashboard"])
+# -------------------- UI: Input Panel --------------------
+st.title("SQL Query Builder")
 
-# -------------------- TAB 1 --------------------
-with tab1:
-    st.title("SQL Query Builder")
-    with st.sidebar:
+with st.sidebar:
     st.header("Input Parameters")
     start_date = st.date_input("Reference Start Date", value=datetime.date(2025, 5, 5))
     end_date = st.date_input("Reference End Date", value=datetime.date(2025, 5, 14))
@@ -158,6 +147,3 @@ ORDER BY 1
 st.subheader("Generated SQL Query")
 sql_code = build_sql()
 st.code(sql_code, language="sql")
-
-with tab2:
-    st.title("Experiment Dashboard")
