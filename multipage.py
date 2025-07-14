@@ -414,7 +414,7 @@ def main():
     diff = pd.Series(index=totals_df.columns, name='Ab. Delta')
     cr_test = totals_df.loc['Test', 'conversion_rate']
     cr_ctrl = totals_df.loc['Control', 'conversion_rate']
-    diff['total_visitors'] = ""	
+    diff['total_visitors'] = NULL	
     diff['conversion_rate'] = f"{int(round((cr_test - cr_ctrl) * 10000, 0))} bps"
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
