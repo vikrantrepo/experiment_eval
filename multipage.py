@@ -549,7 +549,7 @@ def main():
     ax1.set_title('Bootstrap Distribution')
     st.pyplot(fig1)
 
-with col2:
+    with col2:
     fig2, ax2 = plt.subplots(figsize=(4, 3))
     visitor_stats.boxplot(
         column='net_aov',
@@ -565,7 +565,7 @@ with col2:
     plt.suptitle('')
     st.pyplot(fig2)
 
-with col3:
+    with col3:
     fig3, ax3 = plt.subplots(figsize=(4, 3))
     visitor_stats.boxplot(
         column='order_count',
