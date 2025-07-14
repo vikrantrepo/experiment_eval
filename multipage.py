@@ -85,10 +85,11 @@ WITH raw_exposures AS (
   GROUP BY 1, 2, 3, 4
   UNION ALL
   SELECT 'Test' AS bucket,
-        case when a.post_evar42='notApp' and mobile_id=0 then 'Web_desktop'
-	         else case when a.post_evar42='notApp' and mobile_id>0 then 'Web_mobile'
-	             else case when a.post_evar42='android' then 'App_android'
-	                 else case when  a.post_evar42='ios' then 'App_iOS' else 'Undefined' 
+  	b.post_evar59 as shop,
+        case when b.post_evar42='notApp' and mobile_id=0 then 'Web_desktop'
+	         else case when b.post_evar42='notApp' and mobile_id>0 then 'Web_mobile'
+	             else case when b.post_evar42='android' then 'App_android'
+	                 else case when  b.post_evar42='ios' then 'App_iOS' else 'Undefined' 
         end end end end as device_platform, 
         concat(post_visid_high, post_visid_low) AS visitor_id,
         MIN(date_time) AS first_exposure_timestamp
