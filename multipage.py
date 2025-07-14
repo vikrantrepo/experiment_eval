@@ -4,14 +4,12 @@ import datetime
 # -------------------- UI: Input Panel --------------------
 st.title("SQL Query Builder")
 
-with st.sidebar:
-    st.header("Input Parameters")
+col1, col2 = st.columns(2)
+
+with col1:
     start_date = st.date_input("Reference Start Date", value=datetime.date(2025, 5, 5))
-    end_date = st.date_input("Reference End Date", value=datetime.date(2025, 5, 14))
     date_time = st.text_input("Test Start Timestamp", value="2025-05-05 11:00:00")
     control_mvvar3 = st.text_input("Control mvvar3", value="%4747_new_login_registration_page^va:tru%")
-    test_mvvar3 = st.text_input("Test mvvar3", value="%4747_new_login_registration_page^va:fal%")
-
     post_evar59 = st.multiselect("Shops (post_evar59)", options=[
         'zooplus.de', 'zooplus.pl', 'zooplus.fr', 'zooplus.it', 'zooplus.nl', 'zooplus.es',
         'zooplus.co.uk', 'zooplus.hu', 'zooplus.ro', 'zoohit.cz', 'zooplus.se', 'zooplus.be',
@@ -22,12 +20,14 @@ with st.sidebar:
         'zoochic-eu.ru', 'bitiba.fi', 'bitiba.be', 'bitiba.com'
     ], default=['zooplus.de'])
 
+with col2:
+    end_date = st.date_input("Reference End Date", value=datetime.date(2025, 5, 14))
+    test_mvvar3 = st.text_input("Test mvvar3", value="%4747_new_login_registration_page^va:fal%")
     post_evar42 = st.multiselect("Devices (post_evar42)", options=["notApp", "ios", "android"], default=["notApp"])
     post_evar58 = st.text_input("URL Paths (comma-separated)", value="/checkout/login.htm, /checkout/login, /checkout/register")
     post_evar22 = st.text_input("Page Types (comma-separated)", value="checkout")
 
 # -------------------- SQL Query Builder --------------------
-
 def build_sql():
     shops = ", ".join(f"'{s}'" for s in post_evar59)
     devices = ", ".join(f"'{d}'" for d in post_evar42)
