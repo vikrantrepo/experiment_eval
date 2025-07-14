@@ -142,19 +142,17 @@ ORDER BY 1
 """.strip()
     return query
 
-# -------------------- Output --------------------
-
-st.subheader("Generated SQL Query")
-sql_code = build_sql()
-st.code(sql_code, language="sql")
-
-# -------------------- Copy to Clipboard --------------------
-
 from streamlit.components.v1 import html
 
-copy_button = """
-<button onclick="navigator.clipboard.writeText(document.getElementById('sqlcode').innerText); alert('SQL copied to clipboard!');">Copy SQL to Clipboard</button>
-<pre id="sqlcode" style="white-space: pre-wrap; font-family: monospace; font-size: 13px;">{}</pre>
-""".format(sql_code.replace("<", "&lt;").replace(">", "&gt;"))
+sql_code = build_sql()
 
-html(copy_button, height=500)
+# Custom HTML block with both preformatted SQL and copy button
+copy_html = f"""
+<div>
+  <button style="margin-bottom:10px;" onclick="navigator.clipboard.writeText(document.getElementById('sqlcode').innerText); alert('SQL copied to clipboard!');">Copy SQL to Clipboard</button>
+  <pre id="sqlcode" style="white-space: pre-wrap; font-family: monospace; font-size: 13px; border: 1px solid #ddd; padding: 10px; border-radius: 5px;">{sql_code.replace('<', '&lt;').replace('>', '&gt;')}</pre>
+</div>
+"""
+
+st.subheader("Generated SQL Query")
+html(copy_html, height=700)
