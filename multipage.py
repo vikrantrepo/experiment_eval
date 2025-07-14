@@ -582,6 +582,7 @@ def main():
 	    plt.suptitle('')
 	    st.pyplot(fig3)
 
+
     shop_metrics = compute_bucket_metrics_by_level(df, 'shop')
     device_metrics = compute_bucket_metrics_by_level(df, 'device_platform')
     shop_pivot = pivot_metrics(shop_metrics, 'shop').sort_values('total_visitors_Test', ascending=False)
