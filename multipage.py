@@ -413,8 +413,7 @@ def main():
     totals_df = get_bucket_totals(df)
     diff = pd.Series(index=totals_df.columns, name='Ab. Delta')
     cr_test = totals_df.loc['Test', 'conversion_rate']
-    cr_ctrl = totals_df.loc['Control', 'conversion_rate']
-    diff['total_visitors'] = NULL	
+    cr_ctrl = totals_df.loc['Control', 'conversion_rate']	
     diff['conversion_rate'] = f"{int(round((cr_test - cr_ctrl) * 10000, 0))} bps"
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
@@ -461,7 +460,7 @@ def main():
         'cm2_per_total_net_sales': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v
     }
     styled = styled.format(fmt_dict)
-    st.dataframe(styled, use_container_width=True)
+    #st.dataframe(styled, use_container_width=True)
     st.table(styled)
 
     # -------------------- STATISTICAL TESTS & VISUALS --------------------
