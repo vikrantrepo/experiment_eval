@@ -11,7 +11,7 @@ from scipy.stats import norm
 st.set_page_config(page_title="SQL Builder & Experiment Dashboard", layout="wide")
 st.title("🛠️ SQL Builder & 📊 Experiment Dashboard")
 
-tab1, tab2 = st.tabs(["SQL Query Builder", "Experiment Dashboard"])
+tab1, tab2, tab3 = st.tabs(["SQL Query Builder", "Experiment Dashboard", "Documentation"])
 
 # --------------- TAB 1: SQL QUERY BUILDER ---------------
 with tab1:
@@ -633,4 +633,108 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+with tab3:
+    st.header("SQL Builder & Experiment Dashboard")
+    st.markdown("""
+This Streamlit app consists of two main modules:
+
+- **SQL Query Builder**  
+- **Experiment Dashboard**
+
+Each module lives in its own tab, and together they enable you to:
+1. Quickly generate a parameterized SQL query over Adobe and sales data  
+2. Upload the resulting query output and perform a full A/B-test evaluation, complete with metrics, statistical tests, and segment-level insights
+
+---
+
+### 1. SQL Query Builder
+
+**Purpose:**  
+Interactively configure experiment parameters and automatically generate the SQL you need to pull “exposure → conversion → revenue” data for Control vs Test groups.
+
+**Inputs**
+
+| Field                          | What it controls                                  |
+| ------------------------------ | -------------------------------------------------- |
+| Reference Start/End Date       | Date range over which to source raw exposures     |
+| Test Start Timestamp           | Only include exposures after this exact timestamp |
+| Control / Test `mvvar3`        | Regex pattern identifying Control vs Test buckets |
+| Shops (`post_evar59`)          | Which zooplus domains to include                  |
+| Devices (`post_evar42`)        | Filter by Web/iOS/Android                         |
+| URL Paths (`post_evar58`)      | Optional comma-separated page URL filters         |
+| Page Types (`post_evar22`)     | Optional comma-separated page-type filters        |
+
+**Workflow**
+
+1. User picks all parameters in the left and right columns.  
+2. “Build SQL” function:
+   - Assembles CTEs for:
+     - Raw exposures (Control/Test buckets)
+     - Filtering single-bucket visitors
+     - Mapping visitors to customers
+     - Deduplicating orders
+     - Summarizing conversions
+   - Joins exposures to conversions → metrics by bucket  
+3. Generated SQL appears in a syntax-highlighted code block.  
+4. Copy & paste this SQL into your data warehouse to export a CSV.
+
+---
+
+### 2. Experiment Dashboard
+
+**Purpose:**  
+Load the CSV from your SQL query, clean it, compute core metrics and statistical tests, visualize differences, and generate segment-level insights.
+
+**A. Data Load & Cleaning**  
+- Upload CSV via the file uploader.  
+- Verifies required columns  
+  `buckets, exposed_visitor_id, net_sales, order_id, order_status, device_platform, shop, cm1, cm2`  
+- Fills missing values and ensures correct dtypes.
+
+**B. Metric Computation**  
+- `compute_bucket_metrics` returns:
+  - Visitors, converting visitors, conversion rate  
+  - Total orders, L/O orders, net AOV, orders per converter  
+  - Cancellation rate  
+  - Net sales per visitor & total net sales  
+  - CM1/CM2 metrics (per visitor & per sales)  
+- Helpers:
+  - `get_bucket_totals(df)` → overall Control vs Test  
+  - `compute_bucket_metrics_by_level(df, level)` → shop/device breakdown  
+  - `pivot_metrics(...)` → side-by-side with deltas (bps, %)
+
+**C. Outlier Removal**  
+- Identifies top 0.1% of visitors by AOV or orders per converter  
+- Excludes them and reports counts by bucket
+
+**D. Statistical Tests**  
+1. **Bootstrap RPV**: resamples per-visitor net sales → p-value & 95% CI  
+2. **Conversion Z-test**: two-sample z-test on conversion flags  
+3. **Mann-Whitney**: orders per converter & net AOV  
+- Summarized in a table with statistic, p-value, CI, and significance flag
+
+**E. Insights & Contribution Analysis**  
+- **Overall Insight**:  
+  - If RPV significant → reports sign and main driver (CR, OPC, or AOV)  
+  - Otherwise → one-sentence summary with p-values for RPV, CR, AOV  
+- **Revenue Impact Decomposition**:  
+  - Calculates net-sales impact from each metric lever  
+  - Identifies the primary driver
+
+**F. Visualizations**  
+- **Distribution & Boxplots**  
+  - Bootstrap distribution of RPV deltas  
+  - Boxplots: Net AOV & orders per converter by bucket  
+- **Charts by Segment**  
+  - Altair bar charts showing deltas (bps, rel/abs diffs) for shops and devices
+
+**G. Segment-Level Tables & Insights**  
+- **Tables**: shop-level and device-level pivot tables  
+- **Segment Impact**: for each shop, device, and shop×device slice:
+  - Net-sales impact  
+  - Contribution breakdown (CR, OPC, AOV)  
+  - Main contributor label  
+- **Bullet-list Insights**: “Best” & “Worst” segments by impact
+    """, unsafe_allow_html=True)
 
