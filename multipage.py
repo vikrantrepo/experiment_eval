@@ -146,15 +146,5 @@ ORDER BY 1
 
 st.subheader("Generated SQL Query")
 sql_code = build_sql()
-#st.code(sql_code, language="sql")
+st.code(sql_code, language="sql")
 
-# -------------------- Copy to Clipboard --------------------
-
-from streamlit.components.v1 import html
-
-copy_button = """
-<button onclick="navigator.clipboard.writeText(document.getElementById('sqlcode').innerText); alert('SQL copied to clipboard!');">Copy SQL to Clipboard</button>
-<pre id="sqlcode" style="white-space: pre-wrap; font-family: monospace; font-size: 13px;">{}</pre>
-""".format(sql_code.replace("<", "&lt;").replace(">", "&gt;"))
-
-html(copy_button, height=500)
