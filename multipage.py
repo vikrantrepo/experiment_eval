@@ -134,23 +134,25 @@ conversion_summary AS (
 )
 --select distinct buckets,exposed_visitor_id, coalesce(order_id,0) order_id,coalesce(net_sales,0) net_sales, cs.order_status  from bucketed_visitors_first_exposure LEFT JOIN conversion_summary cs ON exposed_visitor_id = cs.converted_visitor_id
 SELECT exp.buckets,
-      COUNT(DISTINCT exp.exposed_visitor_id) AS exposed_visitors,
-      COUNT(DISTINCT cs.converted_visitor_id) AS converted_visitors_post_exposure,
-      ROUND(COUNT(DISTINCT cs.converted_visitor_id) * 1.0 / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS converted_visitor_share,
-      ROUND(SUM(cs.net_sales)) AS total_net_sales,
-      ROUND(SUM(cs.net_sales) / COUNT(DISTINCT exp.exposed_visitor_id), 2) AS net_sales_per_exposed_visitor,
-      ROUND(SUM(cs.net_sales) / COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END), 2) AS net_AOV_with_L_O_orders,
-      ROUND(SUM(cs.cm1) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm1_per_exposed_visitor,
-      ROUND(SUM(cs.cm2) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm2_per_exposed_visitor,
-      ROUND(SUM(cs.cm1) / SUM(cs.net_sales), 4) AS cm1_net_sales_share,
-      ROUND(SUM(cs.cm2) / SUM(cs.net_sales), 4) AS cm2_net_sales_share,
-      ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L', 'O') THEN cs.order_id END) * 1.0 / NULLIF(COUNT(DISTINCT cs.converted_visitor_id), 0), 3) AS orders_per_converted_visitor_with_L_O_orders,
-      COUNT(DISTINCT cs.order_id) AS orders,
-      COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END) AS orders_L_O,
-      ROUND(COUNT(DISTINCT CASE WHEN cs.order_status='S' THEN cs.order_id ELSE NULL END)*1.0 / COUNT(DISTINCT cs.order_id),5) AS orders_cancel_rate
+       COUNT(DISTINCT exp.exposed_visitor_id) AS exposed_visitors,
+       COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.converted_visitor_id ELSE NULL end ) AS converted_visitors_L_O_post_exposure,
+       COUNT(DISTINCT CASE WHEN cs.order_status IN ('L') THEN cs.converted_visitor_id ELSE NULL end ) AS converted_visitors_L_post_exposure,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.converted_visitor_id ELSE NULL end) * 1.0 / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS converted_visitor_share_L_O,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L') THEN cs.converted_visitor_id ELSE NULL end) * 1.0 / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS converted_visitor_share_L,
+       ROUND(SUM(cs.net_sales)) AS total_net_sales,
+       ROUND(SUM(cs.net_sales) / COUNT(DISTINCT exp.exposed_visitor_id), 2) AS net_sales_per_exposed_visitor,
+       ROUND(SUM(cs.net_sales) / COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END), 2) AS net_AOV_with_L_O_orders,
+       ROUND(SUM(cs.cm1) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm1_per_exposed_visitor,
+       ROUND(SUM(cs.cm2) / COUNT(DISTINCT exp.exposed_visitor_id), 4) AS cm2_per_exposed_visitor,
+       ROUND(SUM(cs.cm1) / SUM(cs.net_sales), 4) AS cm1_net_sales_share,
+       ROUND(SUM(cs.cm2) / SUM(cs.net_sales), 4) AS cm2_net_sales_share,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status IN ('L', 'O') THEN cs.order_id END) * 1.0 / NULLIF(COUNT(DISTINCT cs.converted_visitor_id), 0), 3) AS orders_per_converted_visitor_with_L_O_orders,
+       COUNT(DISTINCT cs.order_id) AS orders,
+       COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.order_id ELSE NULL END) AS orders_L_O,
+       ROUND(COUNT(DISTINCT CASE WHEN cs.order_status='S' THEN cs.order_id ELSE NULL END)*1.0 / COUNT(DISTINCT cs.order_id),5) AS orders_cancel_rate
 FROM bucketed_visitors_first_exposure exp
 LEFT JOIN conversion_summary cs ON exp.exposed_visitor_id = cs.converted_visitor_id
-GROUP BY 1
+GROUP BY 1,2
 ORDER BY 1
 """.strip()
         return query
