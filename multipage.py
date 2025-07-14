@@ -1,49 +1,36 @@
-# File: Home.py
-import streamlit as st
+# Streamlit app with two tabs
+def main():
+    import streamlit as st
 
-st.set_page_config(page_title="Home", layout="wide")
-st.title("📊 Experiment Results — Home")
+    st.set_page_config(page_title="Two-Tab App", layout="wide")
+    st.title("📊 Two-Tab Streamlit App")
 
-st.write("Welcome to the Experiment Dashboard. Use the menu on the left to navigate between pages.")
+    # Create two tabs at the top
+    tab1, tab2 = st.tabs(["Overview", "Details"])
 
-# Upload and data loading
-path = st.file_uploader("Upload CSV", type='csv')
-if path:
-    df = ...  # load and clean your DataFrame here
-    st.write("Data preview:")
-    st.dataframe(df.head(), use_container_width=True)
+    # Tab 1: Overview
+    with tab1:
+        st.header("🔍 Overview")
+        st.write("Welcome to the Overview tab. Here you might show summary metrics, charts, or a dashboard overview.")
+        # Example: Display a placeholder metric
+        metric_value = 12345
+        st.metric(label="Total Visitors", value=f"{metric_value:,}")
+        # Example: Simple line chart
+        data = {'Day': ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'], 'Sales': [100, 150, 120, 170, 200]}
+        st.line_chart(data)
 
-# Insight or overview
-st.subheader("🏁 Overall Metrics by Bucket")
-st.write("*(Placeholder for overall metrics table and insight.)*")
+    # Tab 2: Details
+    with tab2:
+        st.header("📋 Details")
+        st.write("Welcome to the Details tab. Here you can show detailed tables, logs, or configurations.")
+        # Example: Data upload and preview
+        uploaded_file = st.file_uploader("Upload CSV for Details", type=['csv'])
+        if uploaded_file:
+            df = pd.read_csv(uploaded_file)
+            st.dataframe(df.head(), use_container_width=True)
+        else:
+            st.info("Please upload a CSV file to view details.")
 
-
-# File: /pages/1_Statistical_Tests.py
-import streamlit as st
-
-st.set_page_config(page_title="Statistical Tests", layout="wide")
-st.title("🔬 Statistical Tests")
-
-st.write("This page shows statistical test results for your experiment data.")
-
-# Assume `df` is passed or reloaded here
-# Example placeholder table
-tests_df = st.session_state.get('tests_df', None)
-if tests_df is not None:
-    st.table(tests_df)
-else:
-    st.info("Upload data on the Home page to see test results.")
-
-# File: /pages/2_Segment_Analysis.py
-import streamlit as st
-
-st.set_page_config(page_title="Segment Analysis", layout="wide")
-st.title("📊 Segment Analysis")
-
-st.write("This page shows segment-level impact insights.")
-
-segments_df = st.session_state.get('segments_df', None)
-if segments_df is not None:
-    st.dataframe(segments_df)
-else:
-    st.info("Upload data on the Home page to see segment analysis.")
+if __name__ == "__main__":
+    import pandas as pd
+    main()
