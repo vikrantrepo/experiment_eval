@@ -461,6 +461,7 @@ def main():
     }
     styled = styled.format(fmt_dict)
     st.dataframe(styled, use_container_width=True)
+    st.table(styled)
 
     # -------------------- STATISTICAL TESTS & VISUALS --------------------
     obs, p_boot, ci_boot, diffs = bootstrap_rpev(df)
