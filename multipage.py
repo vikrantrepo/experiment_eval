@@ -82,7 +82,7 @@ WITH raw_exposures AS (
     AND a.post_evar42 IN ({devices})
     {url_filter_a}
     {page_filter_a}
-  GROUP BY 1, 2
+  GROUP BY 1, 2, 3, 4
   UNION ALL
   SELECT 'Test' AS bucket,
         case when a.post_evar42='notApp' and mobile_id=0 then 'Web_desktop'
@@ -100,7 +100,7 @@ WITH raw_exposures AS (
     AND b.post_evar42 IN ({devices})
     {url_filter_b}
     {page_filter_b}
-  GROUP BY 1, 2
+  GROUP BY 1, 2, 3, 4
 ),
 multi_bucket_visitors AS (
 	  SELECT visitor_id FROM raw_exposures GROUP BY visitor_id HAVING COUNT(DISTINCT bucket) = 1
