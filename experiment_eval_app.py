@@ -170,8 +170,10 @@ ORDER BY 1
         return query
 
     st.subheader("Generated SQL Query")
+    # build the SQL
     sql_code = build_sql()
-    st.code(sql_code, language="sql")
+    clean_sql = "\n".join(line for line in sql_code.splitlines() if line.strip())
+    st.code(clean_sql, language="sql")
 
 
 # --------------- TAB 2: EXPERIMENT DASHBOARD ---------------
