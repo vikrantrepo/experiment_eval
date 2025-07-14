@@ -124,7 +124,7 @@ orders_deduped AS (
   FROM zoobrain_bo.sales_orders so
   JOIN visitor_cid vc ON vc.mapped_customer_id = CAST(so.so_customer_id AS VARCHAR)
   JOIN bucketed_visitors_first_exposure exp ON vc.mapped_visitor_id = exp.exposed_visitor_id
-      AND so.so_order_dt > exp.first_exposure_timestamp
+      AND so.so_order_dt BETWEEN exp.first_exposure_timestamp AND timestamp '{ref_end} 23:59:59'
   GROUP BY 1, 3, 4, 5, 6, 7, 8, 9, 10, 11
 ),
 conversion_summary AS (
