@@ -162,42 +162,5 @@ ORDER BY 1
 # --------------- TAB 2: EXPERIMENT DASHBOARD ---------------
 with tab2:
     st.header("Experiment Eval")
-    # The full code for your experiment dashboard here (as in your message).
-    # To keep this reply concise, I’m not duplicating the whole code block,
-    # just insert your Tab 2 code here starting from:
-    # import pandas as pd, etc...
-    # (You can literally copy everything you posted for Tab2 inside this block.)
-    import pandas as pd
-    import numpy as np
-    import altair as alt
-    import matplotlib.pyplot as plt
-    from scipy.stats import mannwhitneyu
-    from statsmodels.stats.proportion import proportions_ztest
-    from scipy.stats import norm
 
-    # -------------------- DATA LOAD & CLEAN --------------------
-    def load_and_clean(path: str) -> pd.DataFrame:
-        df = pd.read_csv(path)
-        required = {'buckets', 'exposed_visitor_id', 'net_sales', 'order_id', 'order_status', 'device_platform', 'shop', 'cm1', 'cm2'}
-        missing = required.difference(df.columns)
-        if missing:
-            st.error(f"Missing columns: {missing}")
-            st.stop()
-        df['net_sales'] = df['net_sales'].fillna(0.0)
-        df['order_id'] = df['order_id'].fillna(0).astype(int)
-        df['order_status'] = df['order_status'].fillna('Unknown').astype(str)
-        df[['cm1', 'cm2']] = df[['cm1', 'cm2']].fillna(0.0)
-        return df
-
-    # [ ...PASTE THE REST OF YOUR TAB2 CODE HERE, **without** if __name__ == "__main__": ...main() ]
-
-    # (remove the "if __name__ == '__main__'" part and simply call main() directly, like this:)
-    def main():
-        # ... (rest of your experiment dashboard code) ...
-        # Just copy-paste all of your tab2 app code starting from main() here, indented in the tab2 block.
-        # No other changes needed!
-
-        # (Paste all code here as per your Tab2, up to the last line.)
-
-    main()
 
