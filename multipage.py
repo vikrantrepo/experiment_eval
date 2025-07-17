@@ -1,6 +1,6 @@
 import streamlit as st
 import datetime
-import pandas as pd
+import pandas as pdo
 import numpy as np
 import altair as alt
 import matplotlib.pyplot as plt
@@ -294,7 +294,7 @@ def bootstrap_rpev(df: pd.DataFrame, n_iters=10000):
         for _ in range(n_iters)
     ])
     p_val = np.mean(np.abs(diffs) >= abs(obs))
-    ci = np.percentile(diffs, [10, 90])
+    ci = np.percentile(diffs, [50, 50])
     return obs, p_val, ci, diffs
 
 
