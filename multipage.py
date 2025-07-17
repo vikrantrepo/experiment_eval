@@ -294,7 +294,7 @@ def bootstrap_rpev(df: pd.DataFrame, n_iters=10000, seed=42):
         for _ in range(n_iters)
     ])
     p_val = np.mean(np.abs(diffs) >= abs(obs))
-    ci = np.percentile(diffs, [2.5, 97.5])
+    ci = np.percentile(diffs, [5, 95])
     return obs, p_val, ci, diffs
 
 
