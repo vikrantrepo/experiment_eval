@@ -37,8 +37,8 @@ with tab1:
         end_date = st.date_input("Reference End Date", value=datetime.date(2025, 5, 14))
         test_mvvar3 = st.text_input("Test mvvar3", value="%4747_new_login_registration_page^va:fal%")
         post_evar42 = st.multiselect("Devices (post_evar42)", options=["notApp", "ios", "android"], default=["notApp"])
-        post_evar58 = st.text_input("URL Paths (comma-separated)", value="/checkout/login.htm, /checkout/login, /checkout/register")
-        post_evar22 = st.text_input("Page Types (comma-separated)", value="checkout")
+        post_evar58 = st.text_input("URL Paths (comma-separated) *Optional*", value="/checkout/login.htm, /checkout/login, /checkout/register")
+        post_evar22 = st.text_input("Page Types (comma-separated) *Optional*", value="checkout")
 
     def build_sql():
         shops = ", ".join(f"'{s}'" for s in post_evar59)
