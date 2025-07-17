@@ -206,8 +206,8 @@ def load_and_clean(path: str) -> pd.DataFrame:
 # -------------------- METRICS FUNCTIONS --------------------
 def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
     total_visitors = grp['exposed_visitor_id'].nunique()
-    converters = grp[(grp['order_id'] > 0) & grp['order_status'].isin(['L', 'O'])]['exposed_visitor_id'].nunique()
-    orders_all = grp[grp['order_id'] > 0]['order_id'].nunique()
+    converters = grp[(grp['order_id'] > 1) & grp['order_status'].isin(['L', 'O'])]['exposed_visitor_id'].nunique()
+    orders_all = grp[grp['order_id'] > 1]['order_id'].nunique()
     orders_lo = grp[grp['order_status'].isin(['L', 'O'])]['order_id'].nunique()
     sales_sum = grp['net_sales'].sum()
     cancels = grp[grp['order_status'] == 'S']['order_id'].nunique()
@@ -299,7 +299,7 @@ def bootstrap_rpev(df: pd.DataFrame, n_iters=10000, seed=42):
 
 
 def conversion_z_test(df: pd.DataFrame, alpha=0.05):
-    df['converted'] = df['order_id'] > 0
+    df['converted'] = df['order_id'] > 1
     summary = df.groupby('buckets')['converted'].agg(['sum', 'count'])
     successes = np.array([summary.loc['Test', 'sum'], summary.loc['Control', 'sum']])
     nobs = np.array([summary.loc['Test', 'count'], summary.loc['Control', 'count']])
