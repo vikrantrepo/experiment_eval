@@ -144,7 +144,7 @@ conversion_summary AS (
         order_id, net_sales, order_status, order_counter, cm1, cm2, nc_order_f, tnc_order_f
   FROM orders_deduped
 )
---select distinct shop, buckets, device_platform, DENSE_RANK() OVER (ORDER BY exposed_visitor_id) AS exposed_visitor_id, coalesce(order_id,0) order_id,coalesce(net_sales,0) net_sales, coalesce(cs.cm1,0) as cm1,coalesce(cs.cm2,0)  as cm2,cs.order_status from bucketed_visitors_first_exposure LEFT JOIN conversion_summary cs ON exposed_visitor_id = cs.converted_visitor_id
+--select distinct shop, buckets, device_platform, DENSE_RANK() OVER (ORDER BY exposed_visitor_id) AS exposed_visitor_id, DENSE_RANK() OVER (ORDER BY coalesce(order_id,0)) AS order_id,coalesce(net_sales,0) net_sales, coalesce(cs.cm1,0) as cm1,coalesce(cs.cm2,0)  as cm2,cs.order_status from bucketed_visitors_first_exposure LEFT JOIN conversion_summary cs ON exposed_visitor_id = cs.converted_visitor_id
 SELECT exp.buckets, --exp.shop,exp.buckets, exp.device_platform,
        COUNT(DISTINCT exp.exposed_visitor_id) AS exposed_visitors,
        COUNT(DISTINCT CASE WHEN cs.order_status IN ('L','O') THEN cs.converted_visitor_id ELSE NULL end ) AS converted_visitors_L_O_post_exposure,
