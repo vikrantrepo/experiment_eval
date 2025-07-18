@@ -1,9 +1,3 @@
-# The following code to create a dataframe and remove duplicated rows is always executed and acts as a preamble for your script: 
-
-# dataset = pandas.DataFrame(buckets, net_sales, exposed_visitor_id)
-# dataset = dataset.drop_duplicates()
-
-# Paste or type your script code here:
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,16 +6,23 @@ matplotlib.use('Agg')
 
 df = dataset.copy()
 
+# Only successful orders with order_id > 1
 df_success = df[(df['order_status'].isin(['L','O'])) & (df['order_id'] > 1)]
+
+# All exposed visitors (per bucket)
 all_visitors = (
     df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)
     .size()
     .rename(columns={'size':'dummy'})
 )
+
+# Aggregate metrics for converters
 converted_metrics = (
     df_success.groupby(['buckets', 'exposed_visitor_id'], as_index=False)
     .agg({'net_sales':'sum', 'cm1':'sum', 'cm2':'sum'})
 )
+
+# Merge: all visitors, assign sums if converted, else 0
 agg = pd.merge(
     all_visitors,
     converted_metrics,
@@ -30,6 +31,8 @@ agg = pd.merge(
 )
 for col in ['net_sales', 'cm1', 'cm2']:
     agg[col] = agg[col].fillna(0)
+
+# Per-visitor share metrics (only for those with net_sales > 0)
 agg['cm1_share'] = np.where(agg['net_sales']>0, agg['cm1']/agg['net_sales'], np.nan)
 agg['cm2_share'] = np.where(agg['net_sales']>0, agg['cm2']/agg['net_sales'], np.nan)
 
@@ -41,6 +44,7 @@ metrics = [
     ("cm2_share", "CM2 Share of NetSales (for converters only)")
 ]
 
+# Group stats table (mean, std, N for all exposed visitors)
 group_stats = []
 for col, label in metrics:
     for group in ['Test', 'Control']:
@@ -54,7 +58,8 @@ for col, label in metrics:
         })
 group_stats_df = pd.DataFrame(group_stats)
 
-def bayesian_diff(test, ctrl, n_draws=150000):
+# Bayesian evaluation
+def bayesian_diff(test, ctrl, n_draws=15000):
     rng = np.random.default_rng()
     m_t, s_t, n_t = np.mean(test), np.std(test, ddof=1), len(test)
     m_c, s_c, n_c = np.mean(ctrl), np.std(ctrl, ddof=1), len(ctrl)
@@ -87,16 +92,19 @@ for col, label in metrics:
     posteriors.append((label, post_diff, ci))
 results_df = pd.DataFrame(results)
 
-# IMPROVED LAYOUT
-n_post = len([x for x in posteriors if x[1] is not None])
-fig_height = 2.5 * max(n_post, 3)
-fig_width = 20
+# ========== IMPROVED LAYOUT ==========
+
 import matplotlib.gridspec as gridspec
+
+n_post = len([x for x in posteriors if x[1] is not None])
+fig_height = 4.6 + 2.2 * n_post  # More space per plot
+fig_width = 30
+
 gs = gridspec.GridSpec(
     n_post, 2,
-    width_ratios=[1.2, 2.5],
-    height_ratios=[1]*n_post,
-    wspace=0.15, hspace=0.28
+    width_ratios=[2.4, 2.6],
+    height_ratios=[1.25]*n_post,
+    wspace=0.22, hspace=0.55
 )
 
 # LEFT: Both tables, stacked
@@ -105,27 +113,37 @@ table_ax.axis('off')
 
 # Table 1: group stats (at top)
 table1 = table_ax.table(
-    cellText=group_stats_df.values,
+    cellText=group_stats_df.round(4).astype(str).values,
+    colWidths=[0.32, 0.13, 0.13, 0.13, 0.13, 0.13],
     colLabels=group_stats_df.columns,
     loc='upper center',
     cellLoc='center',
-    bbox=[0, 0.54, 1, 0.43]
+    bbox=[0, 0.62, 1, 0.36]
 )
 table1.auto_set_font_size(False)
 table1.set_fontsize(11)
+for key, cell in table1.get_celld().items():
+    cell.set_linewidth(0.6)
+    cell.set_fontsize(10)
+    cell.set_clip_on(False)
 
 # Table 2: bayesian results (below)
 table2 = table_ax.table(
-    cellText=results_df.values,
+    cellText=results_df.astype(str).values,
+    colWidths=[0.32, 0.13, 0.13, 0.13, 0.13, 0.13],
     colLabels=results_df.columns,
     loc='lower center',
     cellLoc='center',
-    bbox=[0, 0.04, 1, 0.47]
+    bbox=[0, 0.06, 1, 0.54]
 )
 table2.auto_set_font_size(False)
 table2.set_fontsize(11)
+for key, cell in table2.get_celld().items():
+    cell.set_linewidth(0.6)
+    cell.set_fontsize(10)
+    cell.set_clip_on(False)
 
-table_ax.set_title('Group & Bayesian Tables', pad=16, fontsize=13)
+table_ax.set_title('Group & Bayesian Tables', pad=14, fontsize=13)
 
 # RIGHT: Posterior plots stacked
 valid_posteriors = [(name, post_diff, ci) for name, post_diff, ci in posteriors if post_diff is not None]
@@ -138,8 +156,9 @@ for i, (name, post_diff, ci) in enumerate(valid_posteriors):
     ax.set_title(f'Posterior: {name} (Test-Control)', fontsize=12)
     ax.set_xlabel('Difference (Test - Control)')
     ax.set_ylabel('Density')
-    if i==0:
-        ax.legend()
+    if i == 0:
+        ax.legend(fontsize=9, loc='upper right')
 
+plt.gcf().set_size_inches(fig_width, fig_height)
 plt.tight_layout()
 plt.show()
