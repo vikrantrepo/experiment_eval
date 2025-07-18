@@ -1,150 +1,145 @@
 # The following code to create a dataframe and remove duplicated rows is always executed and acts as a preamble for your script: 
 
-# dataset = pandas.DataFrame(buckets, exposed_visitor_id, net_sales, order_id, order_status)
+# dataset = pandas.DataFrame(buckets, net_sales, exposed_visitor_id)
 # dataset = dataset.drop_duplicates()
 
 # Paste or type your script code here:
 import pandas as pd
 import numpy as np
-from scipy.stats import mannwhitneyu, norm
-from statsmodels.stats.proportion import proportions_ztest
 import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')
 
 df = dataset.copy()
-df['net_sales'] = df['net_sales'].fillna(0.0)
-df['order_id'] = df['order_id'].fillna(0).astype(int)
-df['order_status'] = df['order_status'].fillna('Unknown').astype(str)
 
-# Compute bucket metrics
-def compute_bucket_metrics(grp):
-    total_visitors = grp['exposed_visitor_id'].nunique()
-    converters = grp[(grp['order_id'] > 1) & grp['order_status'].isin(['L', 'O'])]['exposed_visitor_id'].nunique()
-    orders_lo = grp[grp['order_status'].isin(['L', 'O'])]['order_id'].nunique()
-    sales_sum = grp['net_sales'].sum()
-    net_aov = sales_sum / orders_lo if orders_lo else 0
-    orders_per_converter = orders_lo / converters if converters else 0
-    conversion_rate = converters / total_visitors if total_visitors else 0
-    net_sales_per_visitor = sales_sum / total_visitors if total_visitors else 0
-    return pd.Series({
-        'total_visitors': total_visitors,
-        'converting_visitors': converters,
-        'conversion_rate': conversion_rate,
-        'orders_L_O': orders_lo,
-        'net_aov': net_aov,
-        'orders_per_converter': orders_per_converter,
-        'net_sales_per_visitor': net_sales_per_visitor,
-        'total_net_sales': sales_sum
-    })
-
-totals = df.groupby('buckets').apply(compute_bucket_metrics)
-totals = totals.reindex(['Control', 'Test'])
-
-delta_nspv = totals.loc['Test','net_sales_per_visitor'] - totals.loc['Control','net_sales_per_visitor']
-total_vis_test = totals.loc['Test','total_visitors']
-net_sales_impact = delta_nspv * total_vis_test
-
-cr_c = totals.loc['Control','conversion_rate']
-opc_c = totals.loc['Control','orders_per_converter']
-aov_c = totals.loc['Control','net_aov']
-
-delta_cr = totals.loc['Test','conversion_rate'] - cr_c
-delta_opc = totals.loc['Test','orders_per_converter'] - opc_c
-delta_aov = totals.loc['Test','net_aov'] - aov_c
-
-contr_cr  = delta_cr  * opc_c * aov_c * total_vis_test
-contr_opc = cr_c * delta_opc * aov_c * total_vis_test
-contr_aov = cr_c * opc_c * delta_aov * total_vis_test
-
-# Statistical tests
-def bootstrap_rpev(df: pd.DataFrame, n_iters=20000):
-    visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
-    test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
-    ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
-    obs = test.mean() - ctrl.mean()
-    rng = np.random.default_rng()
-    diffs = np.array([
-        rng.choice(test, size=len(test), replace=True).mean() -
-        rng.choice(ctrl, size=len(ctrl), replace=True).mean()
-        for _ in range(n_iters)
-    ])
-    p_val = np.mean(np.abs(diffs) >= abs(obs))
-    ci = np.percentile(diffs, [2.5, 97.5])
-    return obs, p_val, ci
-
-def conversion_z_test(df: pd.DataFrame, alpha=0.05):
-    df['converted'] = df['order_id'] > 1
-    summary = df.groupby('buckets')['converted'].agg(['sum', 'count'])
-    successes = np.array([summary.loc['Test', 'sum'], summary.loc['Control', 'sum']])
-    nobs = np.array([summary.loc['Test', 'count'], summary.loc['Control', 'count']])
-    _, p = proportions_ztest(successes, nobs)
-    p_pool = successes.sum() / nobs.sum()
-    se = np.sqrt(p_pool * (1 - p_pool) * (1/nobs[0] + 1/nobs[1]))
-    z_alpha = norm.ppf(1 - alpha/2)
-    diff = successes[0]/nobs[0] - successes[1]/nobs[1]
-    ci = (diff - z_alpha * se, diff + z_alpha * se)
-    return diff/se, p, ci
-
-def mann_whitney_tests(df: pd.DataFrame):
-    df_lo = df[df['order_status'].isin(['L', 'O'])]
-    visitor = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
-        total_sales=('net_sales', 'sum'),
-        order_count=('order_id', 'nunique')
-    ).assign(
-        net_aov=lambda x: x.total_sales / x.order_count,
-        orders_per_converted=lambda x: x.order_count
-    ).reset_index()
-    t_o = visitor.loc[visitor.buckets == 'Test', 'orders_per_converted']
-    c_o = visitor.loc[visitor.buckets == 'Control', 'orders_per_converted']
-    t_a = visitor.loc[visitor.buckets == 'Test', 'net_aov']
-    c_a = visitor.loc[visitor.buckets == 'Control', 'net_aov']
-    u_o, p_o = mannwhitneyu(t_o, c_o, alternative='two-sided')
-    u_a, p_a = mannwhitneyu(t_a, c_a, alternative='two-sided')
-    return (u_o, p_o), (u_a, p_a)
-
-obs, p_boot, ci_boot = bootstrap_rpev(df)
-z, p_z, ci_z = conversion_z_test(df)
-(u_o, p_o), (u_a, p_a) = mann_whitney_tests(df)
-
-# Prepare summary table (without Main Contributor)
-table_data = [
-    ["Revenue per Visitor (Bootstrap)", f"{obs:.4f}", f"{p_boot:.3f}", f"{ci_boot[0]:.2f}", f"{ci_boot[1]:.2f}", "Yes" if p_boot < 0.05 else "No", f"{net_sales_impact:,.2f}"],
-    ["Conversion Rate (Z-test)", f"{z:.4f}", f"{p_z:.3f}", f"{ci_z[0]:.4f}", f"{ci_z[1]:.4f}", "Yes" if p_z < 0.05 else "No", f"{contr_cr:,.2f}"],
-    ["Orders per Converter (Mann-Whitney)", f"{u_o:.2f}", f"{p_o:.3f}", "-", "-", "Yes" if p_o < 0.05 else "No", f"{contr_opc:,.2f}"],
-    ["Net AOV (Mann-Whitney)", f"{u_a:.2f}", f"{p_a:.3f}", "-", "-", "Yes" if p_a < 0.05 else "No", f"{contr_aov:,.2f}"]
-]
-
-columns = [
-    "Test",
-    "Statistic",
-    "P-value",
-    "CI Lower",
-    "CI Upper",
-    "Significant",
-    "Net Sales Impact"
-]
-
-# Plot as Matplotlib table
-fig, ax = plt.subplots(figsize=(11, 2.5))
-ax.axis('off')
-tbl = ax.table(
-    cellText=table_data,
-    colLabels=columns,
-    cellLoc='center',
-    loc='left'
+df_success = df[(df['order_status'].isin(['L','O'])) & (df['order_id'] > 1)]
+all_visitors = (
+    df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)
+    .size()
+    .rename(columns={'size':'dummy'})
 )
-tbl.auto_set_font_size(False)
-tbl.set_fontsize(11)
-tbl.auto_set_column_width([i for i in range(len(columns))])
+converted_metrics = (
+    df_success.groupby(['buckets', 'exposed_visitor_id'], as_index=False)
+    .agg({'net_sales':'sum', 'cm1':'sum', 'cm2':'sum'})
+)
+agg = pd.merge(
+    all_visitors,
+    converted_metrics,
+    on=['buckets', 'exposed_visitor_id'],
+    how='left'
+)
+for col in ['net_sales', 'cm1', 'cm2']:
+    agg[col] = agg[col].fillna(0)
+agg['cm1_share'] = np.where(agg['net_sales']>0, agg['cm1']/agg['net_sales'], np.nan)
+agg['cm2_share'] = np.where(agg['net_sales']>0, agg['cm2']/agg['net_sales'], np.nan)
 
-# Optional: bold headers and color significant rows
-for (row, col), cell in tbl.get_celld().items():
-    if row == 0:
-        cell.set_text_props(weight='bold', color='white')
-        cell.set_facecolor('#4f81bd')
-    elif table_data[row-1][5] == "Yes":
-        cell.set_facecolor('#dff0d8')  # light green
-    else:
-        cell.set_facecolor('white')
+metrics = [
+    ("net_sales", "NetSalesPerExposedVisitor"),
+    ("cm1", "CM1PerExposedVisitor"),
+    ("cm2", "CM2PerExposedVisitor"),
+    ("cm1_share", "CM1 Share of NetSales (for converters only)"),
+    ("cm2_share", "CM2 Share of NetSales (for converters only)")
+]
+
+group_stats = []
+for col, label in metrics:
+    for group in ['Test', 'Control']:
+        vals = agg.loc[agg['buckets'] == group, col].dropna()
+        group_stats.append({
+            'Metric': label,
+            'Group': group,
+            'Mean': np.round(np.mean(vals), 4) if len(vals)>0 else 'NA',
+            'Std': np.round(np.std(vals, ddof=1), 4) if len(vals)>1 else 'NA',
+            'N': len(vals)
+        })
+group_stats_df = pd.DataFrame(group_stats)
+
+def bayesian_diff(test, ctrl, n_draws=100000, seed=42):
+    rng = np.random.default_rng(seed)
+    m_t, s_t, n_t = np.mean(test), np.std(test, ddof=1), len(test)
+    m_c, s_c, n_c = np.mean(ctrl), np.std(ctrl, ddof=1), len(ctrl)
+    s_t = s_t if s_t > 0 else 1e-9
+    s_c = s_c if s_c > 0 else 1e-9
+    if n_t < 2 or n_c < 2:
+        return np.nan, [np.nan, np.nan], np.nan, None
+    post_test = rng.normal(m_t, s_t/np.sqrt(n_t), n_draws)
+    post_ctrl = rng.normal(m_c, s_c/np.sqrt(n_c), n_draws)
+    post_diff = post_test - post_ctrl
+    ci = np.percentile(post_diff, [2.5, 97.5])
+    prob = np.mean(post_diff > 0)
+    mean = np.mean(post_diff)
+    return mean, ci, prob, post_diff
+
+results = []
+posteriors = []
+for col, label in metrics:
+    test = agg.loc[agg['buckets'] == 'Test', col].dropna().values
+    ctrl = agg.loc[agg['buckets'] == 'Control', col].dropna().values
+    mean, ci, prob, post_diff = bayesian_diff(test, ctrl)
+    results.append({
+        "Metric": label + " (Bayesian)",
+        "Mean Diff": round(mean, 4) if pd.notnull(mean) else "NA",
+        "CI Lower": round(ci[0], 4) if pd.notnull(ci[0]) else "NA",
+        "CI Upper": round(ci[1], 4) if pd.notnull(ci[1]) else "NA",
+        "P(Test>Control)": f"{prob:.2%}" if pd.notnull(prob) else "NA",
+        "Significant": "Yes" if pd.notnull(prob) and prob > 0.95 else "No"
+    })
+    posteriors.append((label, post_diff, ci))
+results_df = pd.DataFrame(results)
+
+# IMPROVED LAYOUT
+n_post = len([x for x in posteriors if x[1] is not None])
+fig_height = 2.5 * max(n_post, 3)
+fig_width = 20
+import matplotlib.gridspec as gridspec
+gs = gridspec.GridSpec(
+    n_post, 2,
+    width_ratios=[1.2, 2.5],
+    height_ratios=[1]*n_post,
+    wspace=0.15, hspace=0.28
+)
+
+# LEFT: Both tables, stacked
+table_ax = plt.subplot(gs[:,0])
+table_ax.axis('off')
+
+# Table 1: group stats (at top)
+table1 = table_ax.table(
+    cellText=group_stats_df.values,
+    colLabels=group_stats_df.columns,
+    loc='upper center',
+    cellLoc='center',
+    bbox=[0, 0.54, 1, 0.43]
+)
+table1.auto_set_font_size(False)
+table1.set_fontsize(11)
+
+# Table 2: bayesian results (below)
+table2 = table_ax.table(
+    cellText=results_df.values,
+    colLabels=results_df.columns,
+    loc='lower center',
+    cellLoc='center',
+    bbox=[0, 0.04, 1, 0.47]
+)
+table2.auto_set_font_size(False)
+table2.set_fontsize(11)
+
+table_ax.set_title('Group & Bayesian Tables', pad=16, fontsize=13)
+
+# RIGHT: Posterior plots stacked
+valid_posteriors = [(name, post_diff, ci) for name, post_diff, ci in posteriors if post_diff is not None]
+for i, (name, post_diff, ci) in enumerate(valid_posteriors):
+    ax = plt.subplot(gs[i,1])
+    ax.hist(post_diff, bins=40, color='skyblue', alpha=0.7, density=True)
+    ax.axvline(0, color='red', linestyle='--', label='No Effect')
+    ax.axvline(ci[0], color='black', linestyle=':', label='95% CI Lower')
+    ax.axvline(ci[1], color='black', linestyle=':', label='95% CI Upper')
+    ax.set_title(f'Posterior: {name} (Test-Control)', fontsize=12)
+    ax.set_xlabel('Difference (Test - Control)')
+    ax.set_ylabel('Density')
+    if i==0:
+        ax.legend()
 
 plt.tight_layout()
 plt.show()
