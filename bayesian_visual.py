@@ -12,23 +12,16 @@ matplotlib.use('Agg')
 
 df = dataset.copy()
 
-# Only orders that are both successful and have order_id > 1
 df_success = df[(df['order_status'].isin(['L','O'])) & (df['order_id'] > 1)]
-
-# All exposed visitors (per bucket)
 all_visitors = (
     df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)
-    .size()  # just to get all unique combos
+    .size()
     .rename(columns={'size':'dummy'})
 )
-
-# Aggregate metrics for those who actually converted
 converted_metrics = (
     df_success.groupby(['buckets', 'exposed_visitor_id'], as_index=False)
     .agg({'net_sales':'sum', 'cm1':'sum', 'cm2':'sum'})
 )
-
-# Merge: all visitors, assign sums if converted, else 0
 agg = pd.merge(
     all_visitors,
     converted_metrics,
@@ -37,8 +30,6 @@ agg = pd.merge(
 )
 for col in ['net_sales', 'cm1', 'cm2']:
     agg[col] = agg[col].fillna(0)
-
-# Per-visitor share metrics (only for those with net_sales > 0)
 agg['cm1_share'] = np.where(agg['net_sales']>0, agg['cm1']/agg['net_sales'], np.nan)
 agg['cm2_share'] = np.where(agg['net_sales']>0, agg['cm2']/agg['net_sales'], np.nan)
 
@@ -50,7 +41,6 @@ metrics = [
     ("cm2_share", "CM2 Share of NetSales (for converters only)")
 ]
 
-# 1. Group stats table (mean, std, N for all exposed visitors)
 group_stats = []
 for col, label in metrics:
     for group in ['Test', 'Control']:
@@ -64,9 +54,8 @@ for col, label in metrics:
         })
 group_stats_df = pd.DataFrame(group_stats)
 
-# 2. Bayesian evaluation
-def bayesian_diff(test, ctrl, n_draws=100000, seed=42):
-    rng = np.random.default_rng(seed)
+def bayesian_diff(test, ctrl, n_draws=150000):
+    rng = np.random.default_rng()
     m_t, s_t, n_t = np.mean(test), np.std(test, ddof=1), len(test)
     m_c, s_c, n_c = np.mean(ctrl), np.std(ctrl, ddof=1), len(ctrl)
     s_t = s_t if s_t > 0 else 1e-9
@@ -83,7 +72,6 @@ def bayesian_diff(test, ctrl, n_draws=100000, seed=42):
 
 results = []
 posteriors = []
-
 for col, label in metrics:
     test = agg.loc[agg['buckets'] == 'Test', col].dropna().values
     ctrl = agg.loc[agg['buckets'] == 'Control', col].dropna().values
@@ -97,53 +85,61 @@ for col, label in metrics:
         "Significant": "Yes" if pd.notnull(prob) and prob > 0.95 else "No"
     })
     posteriors.append((label, post_diff, ci))
-
 results_df = pd.DataFrame(results)
 
-# 3. Display group statistics table (all exposed visitors)
-fig, ax = plt.subplots(figsize=(10, 2 + 0.22*len(group_stats_df)))
-ax.axis('off')
-tbl = ax.table(
+# IMPROVED LAYOUT
+n_post = len([x for x in posteriors if x[1] is not None])
+fig_height = 2.5 * max(n_post, 3)
+fig_width = 20
+import matplotlib.gridspec as gridspec
+gs = gridspec.GridSpec(
+    n_post, 2,
+    width_ratios=[1.2, 2.5],
+    height_ratios=[1]*n_post,
+    wspace=0.15, hspace=0.28
+)
+
+# LEFT: Both tables, stacked
+table_ax = plt.subplot(gs[:,0])
+table_ax.axis('off')
+
+# Table 1: group stats (at top)
+table1 = table_ax.table(
     cellText=group_stats_df.values,
     colLabels=group_stats_df.columns,
-    loc='center',
-    cellLoc='center'
+    loc='upper center',
+    cellLoc='center',
+    bbox=[0, 0.54, 1, 0.43]
 )
-tbl.auto_set_font_size(False)
-tbl.set_fontsize(11)
-tbl.auto_set_column_width(col=list(range(len(group_stats_df.columns))))
-#plt.tight_layout()
-#plt.show()
+table1.auto_set_font_size(False)
+table1.set_fontsize(11)
 
-# 4. Display Bayesian results table
-fig, ax = plt.subplots(figsize=(11, 0.8 + 0.5*len(results_df)))
-ax.axis('off')
-tbl = ax.table(
+# Table 2: bayesian results (below)
+table2 = table_ax.table(
     cellText=results_df.values,
     colLabels=results_df.columns,
-    loc='center',
-    cellLoc='center'
+    loc='lower center',
+    cellLoc='center',
+    bbox=[0, 0.04, 1, 0.47]
 )
-tbl.auto_set_font_size(False)
-tbl.set_fontsize(12)
-tbl.auto_set_column_width(col=list(range(len(results_df.columns))))
-#plt.tight_layout()
-#plt.show()
+table2.auto_set_font_size(False)
+table2.set_fontsize(11)
 
-# 5. Posterior plots
+table_ax.set_title('Group & Bayesian Tables', pad=16, fontsize=13)
+
+# RIGHT: Posterior plots stacked
 valid_posteriors = [(name, post_diff, ci) for name, post_diff, ci in posteriors if post_diff is not None]
-n_plots = len(valid_posteriors)
-fig, axes = plt.subplots(n_plots, 1, figsize=(7, 2.3 * n_plots))
-if n_plots == 1:
-    axes = [axes]
-for ax, (name, post_diff, ci) in zip(axes, valid_posteriors):
-    ax.hist(post_diff, bins=50, color='skyblue', alpha=0.7, density=True)
+for i, (name, post_diff, ci) in enumerate(valid_posteriors):
+    ax = plt.subplot(gs[i,1])
+    ax.hist(post_diff, bins=40, color='skyblue', alpha=0.7, density=True)
     ax.axvline(0, color='red', linestyle='--', label='No Effect')
     ax.axvline(ci[0], color='black', linestyle=':', label='95% CI Lower')
     ax.axvline(ci[1], color='black', linestyle=':', label='95% CI Upper')
-    ax.set_title(f'Posterior: {name} (Test-Control)')
+    ax.set_title(f'Posterior: {name} (Test-Control)', fontsize=12)
     ax.set_xlabel('Difference (Test - Control)')
     ax.set_ylabel('Density')
-    ax.legend()
+    if i==0:
+        ax.legend()
+
 plt.tight_layout()
 plt.show()
