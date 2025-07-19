@@ -59,7 +59,7 @@ for col, label in metrics:
 group_stats_df = pd.DataFrame(group_stats)
 
 # Bayesian evaluation
-def bayesian_diff(test, ctrl, n_draws=15000):
+def bayesian_diff(test, ctrl, n_draws=150):
     rng = np.random.default_rng()
     m_t, s_t, n_t = np.mean(test), np.std(test, ddof=1), len(test)
     m_c, s_c, n_c = np.mean(ctrl), np.std(ctrl, ddof=1), len(ctrl)
@@ -92,17 +92,17 @@ for col, label in metrics:
     posteriors.append((label, post_diff, ci))
 results_df = pd.DataFrame(results)
 
-# ========== IMPROVED LAYOUT ==========
+# ========== IMPROVED LAYOUT WITH HIGHLIGHTING ==========
 
 import matplotlib.gridspec as gridspec
 
 n_post = len([x for x in posteriors if x[1] is not None])
-fig_height = 4.6 + 2.2 * n_post  # More space per plot
+fig_height = 4.6 + 2.2 * n_post
 fig_width = 30
 
 gs = gridspec.GridSpec(
     n_post, 2,
-    width_ratios=[2.4, 2.6],
+    width_ratios=[2.8, 2.6],
     height_ratios=[1.25]*n_post,
     wspace=0.22, hspace=0.55
 )
@@ -114,7 +114,7 @@ table_ax.axis('off')
 # Table 1: group stats (at top)
 table1 = table_ax.table(
     cellText=group_stats_df.round(4).astype(str).values,
-    colWidths=[0.32, 0.13, 0.13, 0.13, 0.13, 0.13],
+    colWidths=[0.36, 0.13, 0.13, 0.13, 0.13],
     colLabels=group_stats_df.columns,
     loc='upper center',
     cellLoc='center',
@@ -124,13 +124,13 @@ table1.auto_set_font_size(False)
 table1.set_fontsize(11)
 for key, cell in table1.get_celld().items():
     cell.set_linewidth(0.6)
-    cell.set_fontsize(10)
+    cell.set_fontsize(11)
     cell.set_clip_on(False)
 
-# Table 2: bayesian results (below)
+# Table 2: bayesian results (below), with highlight
 table2 = table_ax.table(
     cellText=results_df.astype(str).values,
-    colWidths=[0.32, 0.13, 0.13, 0.13, 0.13, 0.13],
+    colWidths=[0.36, 0.13, 0.13, 0.13, 0.13, 0.13],
     colLabels=results_df.columns,
     loc='lower center',
     cellLoc='center',
@@ -140,8 +140,17 @@ table2.auto_set_font_size(False)
 table2.set_fontsize(11)
 for key, cell in table2.get_celld().items():
     cell.set_linewidth(0.6)
-    cell.set_fontsize(10)
+    cell.set_fontsize(11)
     cell.set_clip_on(False)
+
+# --- HIGHLIGHT significant rows in table 2 ---
+highlight_color = "#b6fcb6"  # light green
+n_rows = results_df.shape[0]
+n_cols = results_df.shape[1]
+for row_idx in range(n_rows):
+    if results_df.iloc[row_idx]["Significant"] == "Yes":
+        for col_idx in range(n_cols):
+            table2[(row_idx+1, col_idx)].set_facecolor(highlight_color)  # +1 because row 0 is header
 
 table_ax.set_title('Group & Bayesian Tables', pad=14, fontsize=13)
 
@@ -157,7 +166,7 @@ for i, (name, post_diff, ci) in enumerate(valid_posteriors):
     ax.set_xlabel('Difference (Test - Control)')
     ax.set_ylabel('Density')
     if i == 0:
-        ax.legend(fontsize=9, loc='upper right')
+        ax.legend(fontsize=11, loc='upper right')
 
 plt.gcf().set_size_inches(fig_width, fig_height)
 plt.tight_layout()
