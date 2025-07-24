@@ -535,7 +535,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=50000, cred_mass=0.95):
         rng = np.random.default_rng()
         # 1) draw all Dirichlet weights in one go
         Wc = rng.dirichlet(np.ones(len(ctrl_vals)), size=n_iters)
