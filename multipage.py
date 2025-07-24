@@ -527,9 +527,6 @@ def main():
         )
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
-	
-    st.subheader("🔬 Statistical Tests Summary")
-    st.table(stats_summary.set_index('Test'))
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
