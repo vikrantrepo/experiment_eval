@@ -527,22 +527,22 @@ def main():
             f"{ctrl_cm2s:.2%} to {test_cm2s:.2%} (no tests on CM metrics)."
         )
         st.write(f"**Insight:** {paragraph}")
-    stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
+    stats_summary['Impact'] = [
+    f"€{int(net_sales_impact)}",
+    f"€{int(contr_cr)}",
+    f"€{int(contr_opc)}",
+    f"€{int(contr_aov)}"]
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
     def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
         rng = np.random.default_rng()
-        # 1) draw all Dirichlet weights in one go
-        Wc = rng.dirichlet(np.ones(len(ctrl_vals)), size=n_iters)
-        Wt = rng.dirichlet(np.ones(len(test_vals)), size=n_iters)
-
-        # 2) compute all bootstrap means in two matrix multiplies
-        ctrl_samps = Wc @ ctrl_vals
-        test_samps = Wt @ test_vals
-
-        # 3) differences, CI, P(>0)
-        diffs = test_samps - ctrl_samps
+        diffs = []
+        for _ in range(n_iters):
+            w_c = rng.dirichlet(np.ones(len(ctrl_vals)))
+            w_t = rng.dirichlet(np.ones(len(test_vals)))
+            diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
+        diffs = np.array(diffs)
         lo, hi = np.percentile(diffs, [(1-cred_mass)/2*100, (1+cred_mass)/2*100])
         prob = (diffs > 0).mean()
         return prob, lo, hi
@@ -603,7 +603,7 @@ def main():
             'P(Test > Control)':      f"{p*100:.2f}%",
             'CI Lower':               f"{lo:.4f}",
             'CI Upper':               f"{hi:.4f}",
-            'Impact':                 f"{impact}"
+            'Impact':                 f"€{impact}"
         })
 
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
