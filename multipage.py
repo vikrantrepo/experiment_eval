@@ -503,6 +503,48 @@ def main():
     primary = max(contributors, key=lambda k: contributors[k]) if net_sales_impact >= 0 else min(contributors, key=lambda k: contributors[k])
     sign = 'positive' if net_sales_impact >= 0 else 'negative'
 
+    # --- new conditional Insight ---
+    alpha = 0.05
+    if p_boot < alpha:
+        # RPV is significant
+        st.write(f"**Insight:** The difference in **Revenue per Visitor** is statistically significant _(p = {p_boot:.3f})_.")
+        st.write(f"> Overall net-sales impact is **{sign}** (€{net_sales_impact:.2f}) and the primary driver is **{primary}**.")
+    else:
+        # RPV not significant: one paragraph with significance flags
+        ctrl_nspv = totals_df.loc['Control','net_sales_per_visitor']
+        test_nspv = totals_df.loc['Test','net_sales_per_visitor']
+        ctrl_cr    = totals_df.loc['Control','conversion_rate']
+        test_cr    = totals_df.loc['Test','conversion_rate']
+        ctrl_aov   = totals_df.loc['Control','net_aov']
+        test_aov   = totals_df.loc['Test','net_aov']
+        ctrl_cm1v  = totals_df.loc['Control','cm1_per_total_visitors']
+        test_cm1v  = totals_df.loc['Test','cm1_per_total_visitors']
+        ctrl_cm2v  = totals_df.loc['Control','cm2_per_total_visitors']
+        test_cm2v  = totals_df.loc['Test','cm2_per_total_visitors']
+        ctrl_cm1s  = totals_df.loc['Control','cm1_per_total_net_sales']
+        test_cm1s  = totals_df.loc['Test','cm1_per_total_net_sales']
+        ctrl_cm2s  = totals_df.loc['Control','cm2_per_total_net_sales']
+        test_cm2s  = totals_df.loc['Test','cm2_per_total_net_sales']
+
+        sig_rpv = "significant" if p_boot < alpha else "not significant"
+        sig_cr  = "significant" if p_z    < alpha else "not significant"
+        sig_aov = "significant" if p_a    < alpha else "not significant"
+
+        paragraph = (
+            f"Revenue per visitor changed from €{ctrl_nspv:.2f} to €{test_nspv:.2f} "
+            f"(p = {p_boot:.3f}, {sig_rpv}); conversion rate from {ctrl_cr:.2%} to {test_cr:.2%} "
+            f"(p = {p_z:.3f}, {sig_cr}); net AOV from €{ctrl_aov:.2f} to €{test_aov:.2f} "
+            f"(p = {p_a:.3f}, {sig_aov}). CM1 per visitor moved from €{ctrl_cm1v:.2f} to €{test_cm1v:.2f} "
+            f"(no test), and CM2 per visitor from €{ctrl_cm2v:.2f} to €{test_cm2v:.2f} (no test). "
+            f"By net sales, CM1 went from {ctrl_cm1s:.2%} to {test_cm1s:.2%}, and CM2 from "
+            f"{ctrl_cm2s:.2%} to {test_cm2s:.2%} (no tests on CM metrics)."
+        )
+        st.write(f"**Insight:** {paragraph}")
+    stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
+	
+    st.subheader("🔬 Statistical Tests Summary")
+    st.table(stats_summary.set_index('Test'))
+
     metrics = {
     'Revenue per Visitor': 'net_sales_per_visitor',
     'CM1 per Visitor':       'cm1_per_total_visitors',
@@ -546,48 +588,6 @@ def main():
         })
 
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
-
-    # --- new conditional Insight ---
-    alpha = 0.05
-    if p_boot < alpha:
-        # RPV is significant
-        st.write(f"**Insight:** The difference in **Revenue per Visitor** is statistically significant _(p = {p_boot:.3f})_.")
-        st.write(f"> Overall net-sales impact is **{sign}** (€{net_sales_impact:.2f}) and the primary driver is **{primary}**.")
-    else:
-        # RPV not significant: one paragraph with significance flags
-        ctrl_nspv = totals_df.loc['Control','net_sales_per_visitor']
-        test_nspv = totals_df.loc['Test','net_sales_per_visitor']
-        ctrl_cr    = totals_df.loc['Control','conversion_rate']
-        test_cr    = totals_df.loc['Test','conversion_rate']
-        ctrl_aov   = totals_df.loc['Control','net_aov']
-        test_aov   = totals_df.loc['Test','net_aov']
-        ctrl_cm1v  = totals_df.loc['Control','cm1_per_total_visitors']
-        test_cm1v  = totals_df.loc['Test','cm1_per_total_visitors']
-        ctrl_cm2v  = totals_df.loc['Control','cm2_per_total_visitors']
-        test_cm2v  = totals_df.loc['Test','cm2_per_total_visitors']
-        ctrl_cm1s  = totals_df.loc['Control','cm1_per_total_net_sales']
-        test_cm1s  = totals_df.loc['Test','cm1_per_total_net_sales']
-        ctrl_cm2s  = totals_df.loc['Control','cm2_per_total_net_sales']
-        test_cm2s  = totals_df.loc['Test','cm2_per_total_net_sales']
-
-        sig_rpv = "significant" if p_boot < alpha else "not significant"
-        sig_cr  = "significant" if p_z    < alpha else "not significant"
-        sig_aov = "significant" if p_a    < alpha else "not significant"
-
-        paragraph = (
-            f"Revenue per visitor changed from €{ctrl_nspv:.2f} to €{test_nspv:.2f} "
-            f"(p = {p_boot:.3f}, {sig_rpv}); conversion rate from {ctrl_cr:.2%} to {test_cr:.2%} "
-            f"(p = {p_z:.3f}, {sig_cr}); net AOV from €{ctrl_aov:.2f} to €{test_aov:.2f} "
-            f"(p = {p_a:.3f}, {sig_aov}). CM1 per visitor moved from €{ctrl_cm1v:.2f} to €{test_cm1v:.2f} "
-            f"(no test), and CM2 per visitor from €{ctrl_cm2v:.2f} to €{test_cm2v:.2f} (no test). "
-            f"By net sales, CM1 went from {ctrl_cm1s:.2%} to {test_cm1s:.2%}, and CM2 from "
-            f"{ctrl_cm2s:.2%} to {test_cm2s:.2%} (no tests on CM metrics)."
-        )
-        st.write(f"**Insight:** {paragraph}")
-    stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
-	
-    st.subheader("🔬 Statistical Tests Summary")
-    st.table(stats_summary.set_index('Test'))
 
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
