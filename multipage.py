@@ -329,6 +329,20 @@ def mann_whitney_tests(df: pd.DataFrame):
     u_a, p_a = mannwhitneyu(t_a, c_a, alternative='two-sided')
     return (u_o, p_o), (u_a, p_a)
 
+def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+    """Return posterior draws of Test–Control via Bayesian bootstrap."""
+    rng = np.random.default_rng()
+    diffs = []
+    n_c, n_t = len(ctrl_vals), len(test_vals)
+    for _ in range(n_iters):
+        w_c = rng.dirichlet(np.ones(n_c))
+        w_t = rng.dirichlet(np.ones(n_t))
+        diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
+    diffs = np.array(diffs)
+    lower, upper = np.percentile(diffs, [(1 - cred_mass) / 2 * 100, (1 + cred_mass) / 2 * 100])
+    prob = (diffs > 0).mean()  # Pr(Test > Control)
+    return prob, lower, upper
+
 # -------------------- VISUALIZATION HELPERS --------------------
 def show_visuals(df: pd.DataFrame, index_col: str):
     cols = ['conversion_rate_diff_bps', 'net_sales_per_visitor_abs_diff', 'net_aov_rel_diff', 'orders_per_converter_rel_diff']
@@ -488,6 +502,14 @@ def main():
     contributors = {'Conversion Rate': contr_cr, 'Orders per Converted Visitor': contr_opc, 'Net AOV': contr_aov}
     primary = max(contributors, key=lambda k: contributors[k]) if net_sales_impact >= 0 else min(contributors, key=lambda k: contributors[k])
     sign = 'positive' if net_sales_impact >= 0 else 'negative'
+
+    metrics = {
+    'Revenue per Visitor': 'net_sales_per_visitor',
+    'CM1 per Visitor':       'cm1_per_total_visitors',
+    'CM2 per Visitor':       'cm2_per_total_visitors',
+    'CM1 Share of Net Sales':'cm1_per_total_net_sales',
+    'CM2 Share of Net Sales':'cm2_per_total_net_sales'
+    }
 
     # --- new conditional Insight ---
     alpha = 0.05
