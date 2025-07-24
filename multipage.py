@@ -331,6 +331,22 @@ def mann_whitney_tests(df: pd.DataFrame):
     u_a, p_a = mannwhitneyu(t_a, c_a, alternative='two-sided')
     return (u_o, p_o), (u_a, p_a)
 
+# -------------------- BAYESIAN HELPER --------------------
+def bayesian_group_compare(test_vals, ctrl_vals, draws=2000, tune=1000):
+    with pm.Model() as model:
+        mu_ctrl = pm.Normal('mu_ctrl', mu=ctrl_vals.mean(), sd=ctrl_vals.std()*2)
+        mu_test = pm.Normal('mu_test',  mu=test_vals.mean(), sd=test_vals.std()*2)
+        sigma_ctrl = pm.HalfNormal('sigma_ctrl', sd=ctrl_vals.std()*2)
+        sigma_test = pm.HalfNormal('sigma_test', sd=test_vals.std()*2)
+        pm.Normal('obs_ctrl', mu=mu_ctrl, sd=sigma_ctrl, observed=ctrl_vals)
+        pm.Normal('obs_test',  mu=mu_test,  sd=sigma_test,  observed=test_vals)
+        delta = pm.Deterministic('delta', mu_test - mu_ctrl)
+        trace = pm.sample(draws=draws, tune=tune, target_accept=0.95, cores=1, progressbar=False)
+    summary = az.summary(trace, var_names=['delta'], hdi_prob=0.95)
+    prob  = (trace['delta'] > 0).mean()
+    hdi    = az.hdi(trace['delta'], hdi_prob=0.95)
+    return summary.loc['delta','mean'], prob, hdi[0], hdi[1]
+
 # -------------------- VISUALIZATION HELPERS --------------------
 def show_visuals(df: pd.DataFrame, index_col: str):
     cols = ['conversion_rate_diff_bps', 'net_sales_per_visitor_abs_diff', 'net_aov_rel_diff', 'orders_per_converter_rel_diff']
@@ -530,36 +546,6 @@ def main():
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
 	
-	# --- Formal Bayesian analysis for selected metrics ---
-	# Helper to run a Bayesian model comparing two groups
-	
-	def bayesian_group_compare(test_vals, ctrl_vals, metric_name, draws=2000, tune=1000):
-		with pm.Model() as model:
-	        # Priors on group means
-	        mu_ctrl = pm.Normal('mu_ctrl', mu=ctrl_vals.mean(), sd=ctrl_vals.std()*2)
-	        mu_test = pm.Normal('mu_test', mu=test_vals.mean(), sd=test_vals.std()*2)
-	        # Priors on group standard deviations (HalfNormal)
-	        sigma_ctrl = pm.HalfNormal('sigma_ctrl', sd=ctrl_vals.std()*2)
-	        sigma_test = pm.HalfNormal('sigma_test', sd=test_vals.std()*2)
-	
-	        # Likelihoods
-	        obs_ctrl = pm.Normal('obs_ctrl', mu=mu_ctrl, sd=sigma_ctrl, observed=ctrl_vals)
-	        obs_test = pm.Normal('obs_test', mu=mu_test, sd=sigma_test, observed=test_vals)
-	
-	        # Define the difference
-	        delta = pm.Deterministic('delta', mu_test - mu_ctrl)
-	
-	        # Sample
-	        trace = pm.sample(draws=draws, tune=tune, target_accept=0.95, cores=1, progressbar=False)
-	
-	    # Summarize posterior
-	    summary = az.summary(trace, var_names=['mu_ctrl', 'mu_test', 'delta'], hdi_prob=0.95)
-	    # Probability that delta > 0
-	    prob_positive = (trace['delta'] > 0).mean()
-	    # Extract HDI for delta
-	    hdi = az.hdi(trace['delta'], hdi_prob=0.95)
-	
-	    return summary.loc['delta', 'mean'], prob_positive, hdi[0], hdi[1]
 	
 	# Aggregate per-visitor metrics
 	visitor_summary = df.groupby(['buckets', 'exposed_visitor_id']).agg(
@@ -568,7 +554,7 @@ def main():
 	    cm2_sum=('cm2', 'sum'),
 	).reset_index()
 	# Compute share columns safely
-	visitor_summary['cm1_share'] = visitor_summary['cm1_sum'] / visitor_summary['revenue'].replace(0, np.nan)
+    visitor_summary['cm1_share'] = visitor_summary['cm1_sum'] / visitor_summary['revenue'].replace(0, np.nan)
 	visitor_summary['cm2_share'] = visitor_summary['cm2_sum'] / visitor_summary['revenue'].replace(0, np.nan)
 	
 	# Define metrics and labels
