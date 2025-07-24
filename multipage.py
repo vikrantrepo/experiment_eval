@@ -530,13 +530,11 @@ def main():
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
 	
-	
-	
 	# --- Formal Bayesian analysis for selected metrics ---
 	# Helper to run a Bayesian model comparing two groups
 	
 	def bayesian_group_compare(test_vals, ctrl_vals, metric_name, draws=2000, tune=1000):
-	    with pm.Model() as model:
+		with pm.Model() as model:
 	        # Priors on group means
 	        mu_ctrl = pm.Normal('mu_ctrl', mu=ctrl_vals.mean(), sd=ctrl_vals.std()*2)
 	        mu_test = pm.Normal('mu_test', mu=test_vals.mean(), sd=test_vals.std()*2)
