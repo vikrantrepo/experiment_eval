@@ -528,7 +528,7 @@ def main():
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
 
-	def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
 	    """Return posterior draws of Test–Control via Bayesian bootstrap."""
 	    rng = np.random.default_rng()
 	    diffs = []
