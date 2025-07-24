@@ -329,20 +329,6 @@ def mann_whitney_tests(df: pd.DataFrame):
     u_a, p_a = mannwhitneyu(t_a, c_a, alternative='two-sided')
     return (u_o, p_o), (u_a, p_a)
 
-def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
-    """Return posterior draws of Test–Control via Bayesian bootstrap."""
-    rng = np.random.default_rng()
-    diffs = []
-    n_c, n_t = len(ctrl_vals), len(test_vals)
-    for _ in range(n_iters):
-        w_c = rng.dirichlet(np.ones(n_c))
-        w_t = rng.dirichlet(np.ones(n_t))
-        diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
-    diffs = np.array(diffs)
-    lower, upper = np.percentile(diffs, [(1 - cred_mass) / 2 * 100, (1 + cred_mass) / 2 * 100])
-    prob = (diffs > 0).mean()  # Pr(Test > Control)
-    return prob, lower, upper
-
 # -------------------- VISUALIZATION HELPERS --------------------
 def show_visuals(df: pd.DataFrame, index_col: str):
     cols = ['conversion_rate_diff_bps', 'net_sales_per_visitor_abs_diff', 'net_aov_rel_diff', 'orders_per_converter_rel_diff']
@@ -545,6 +531,20 @@ def main():
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'))
 
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+        """Return posterior draws of Test–Control via Bayesian bootstrap."""
+        rng = np.random.default_rng()
+        diffs = []
+        n_c, n_t = len(ctrl_vals), len(test_vals)
+        for _ in range(n_iters):
+            w_c = rng.dirichlet(np.ones(n_c))
+            w_t = rng.dirichlet(np.ones(n_t))
+            diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
+        diffs = np.array(diffs)
+        lower, upper = np.percentile(diffs, [(1 - cred_mass) / 2 * 100, (1 + cred_mass) / 2 * 100])
+        prob = (diffs > 0).mean()  # Pr(Test > Control)
+        return prob, lower, upper
+
     metrics = {
     'Revenue per Visitor': 'net_sales_per_visitor',
     'CM1 per Visitor':       'cm1_per_total_visitors',
@@ -588,6 +588,14 @@ def main():
         })
 
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("🔬 Frequentist Tests")
+        st.table(stats_summary.set_index('Test'))
+    with col2:
+        st.subheader("🔭 Bayesian Analysis")
+        st.table(bayes_summary)
 
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
