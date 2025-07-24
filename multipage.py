@@ -527,8 +527,88 @@ def main():
         )
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
-    st.subheader("🔬 Statistical Tests Summary")
-    st.table(stats_summary.set_index('Test'))
+	
+	import pymc3 as pm
+	import arviz as az
+	
+	# --- Formal Bayesian analysis for selected metrics ---
+	# Helper to run a Bayesian model comparing two groups
+	
+	def bayesian_group_compare(test_vals, ctrl_vals, metric_name, draws=2000, tune=1000):
+	    with pm.Model() as model:
+	        # Priors on group means
+	        mu_ctrl = pm.Normal('mu_ctrl', mu=ctrl_vals.mean(), sd=ctrl_vals.std()*2)
+	        mu_test = pm.Normal('mu_test', mu=test_vals.mean(), sd=test_vals.std()*2)
+	        # Priors on group standard deviations (HalfNormal)
+	        sigma_ctrl = pm.HalfNormal('sigma_ctrl', sd=ctrl_vals.std()*2)
+	        sigma_test = pm.HalfNormal('sigma_test', sd=test_vals.std()*2)
+	
+	        # Likelihoods
+	        obs_ctrl = pm.Normal('obs_ctrl', mu=mu_ctrl, sd=sigma_ctrl, observed=ctrl_vals)
+	        obs_test = pm.Normal('obs_test', mu=mu_test, sd=sigma_test, observed=test_vals)
+	
+	        # Define the difference
+	        delta = pm.Deterministic('delta', mu_test - mu_ctrl)
+	
+	        # Sample
+	        trace = pm.sample(draws=draws, tune=tune, target_accept=0.95, cores=1, progressbar=False)
+	
+	    # Summarize posterior
+	    summary = az.summary(trace, var_names=['mu_ctrl', 'mu_test', 'delta'], hdi_prob=0.95)
+	    # Probability that delta > 0
+	    prob_positive = (trace['delta'] > 0).mean()
+	    # Extract HDI for delta
+	    hdi = az.hdi(trace['delta'], hdi_prob=0.95)
+	
+	    return summary.loc['delta', 'mean'], prob_positive, hdi[0], hdi[1]
+	
+	# Aggregate per-visitor metrics
+	visitor_summary = df.groupby(['buckets', 'exposed_visitor_id']).agg(
+	    revenue=('net_sales', 'sum'),
+	    cm1_sum=('cm1', 'sum'),
+	    cm2_sum=('cm2', 'sum'),
+	).reset_index()
+	# Compute share columns safely
+	visitor_summary['cm1_share'] = visitor_summary['cm1_sum'] / visitor_summary['revenue'].replace(0, np.nan)
+	visitor_summary['cm2_share'] = visitor_summary['cm2_sum'] / visitor_summary['revenue'].replace(0, np.nan)
+	
+	# Define metrics and labels
+	to_model = [
+	    ('revenue', 'Net Sales per Visitor'),
+	    ('cm1_sum', 'CM1 per Visitor'),
+	    ('cm2_sum', 'CM2 per Visitor'),
+	    ('cm1_share', 'CM1 Share of Net Sales'),
+	    ('cm2_share', 'CM2 Share of Net Sales'),
+	]
+	
+	# Run Bayesian models
+	bayes_results = []
+	for col, label in to_model:
+	    arr = visitor_summary.pivot(index='exposed_visitor_id', columns='buckets', values=col)
+	    test_vals = arr['Test'].dropna().values
+	    ctrl_vals = arr['Control'].dropna().values
+	    # Skip if no data
+	    if len(test_vals) < 2 or len(ctrl_vals) < 2:
+	        continue
+	    mean_diff, prob, lo, hi = bayesian_group_compare(test_vals, ctrl_vals, label)
+	    bayes_results.append({
+	        'Metric': label,
+	        'Statistic': f"{mean_diff:.4f}",
+	        'P(Test>Control)': f"{prob:.3f}",
+	        'CI Lower': lo,
+	        'CI Upper': hi,
+	        'Impact': ''
+	    })
+	bayes_df = pd.DataFrame(bayes_results).set_index('Metric')
+	
+	# Display alongside frequentist tests
+	col_stats, col_bayes = st.columns(2)
+	with col_stats:
+	    st.subheader("🔬 Statistical Tests Summary")
+	    st.table(stats_summary.set_index('Test'))
+	with col_bayes:
+	    st.subheader("🔎 Bayesian Analysis Summary (PyMC3)")
+	    st.table(bayes_df)
 
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
