@@ -447,7 +447,7 @@ def main():
         'total_visitors': '{:,.0f}',
         'converting_visitors': '{:,.0f}',
         'orders_all': '{:,.0f}',
-        'orders_L_O': '{:,.0f}',
+        'orders_L': '{:,.0f}',
         'total_net_sales': '€{:,.0f}',
         'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
         'net_aov': lambda v: f"€{v:.2f}",
