@@ -474,6 +474,7 @@ def main():
         { 'Test': 'Net AOV (Mann-Whitney)', 'Statistic': f"{u_a:.2f}", 'P-value': p_a, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_a < 0.05 else 'No' }
     ])
     total_vis_test = totals_df.loc['Test','total_visitors']
+    total_sales_test = totals_df.loc['Test',    'total_net_sales'] 
     cr_c = totals_df.loc['Control','conversion_rate']
     opc_c = totals_df.loc['Control','orders_per_converting_visitor']
     aov_c = totals_df.loc['Control','net_aov']
@@ -530,7 +531,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=20000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=100000, cred_mass=0.95):
         rng = np.random.default_rng()
         diffs = []
         for _ in range(n_iters):
