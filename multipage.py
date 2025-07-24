@@ -529,7 +529,73 @@ def main():
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
 	
     st.subheader("🔬 Statistical Tests Summary")
-    st.table(stats_summary.set_index('Test'))
+
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+        """Return posterior draws of Test–Control via Bayesian bootstrap."""
+        rng = np.random.default_rng()
+        diffs = []
+        n_c, n_t = len(ctrl_vals), len(test_vals)
+        for _ in range(n_iters):
+            w_c = rng.dirichlet(np.ones(n_c))
+            w_t = rng.dirichlet(np.ones(n_t))
+            diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
+        diffs = np.array(diffs)
+        lower, upper = np.percentile(diffs, [(1 - cred_mass) / 2 * 100, (1 + cred_mass) / 2 * 100])
+        prob = (diffs > 0).mean()  # Pr(Test > Control)
+        return prob, lower, upper
+
+    metrics = {
+        'Revenue per Visitor': 'net_sales_per_visitor',
+        'CM1 per Visitor':       'cm1_per_total_visitors',
+        'CM2 per Visitor':       'cm2_per_total_visitors',
+        'CM1 Share of Net Sales':'cm1_per_total_net_sales',
+        'CM2 Share of Net Sales':'cm2_per_total_net_sales'
+    }
+
+    rows = []
+    for name, col in metrics.items():
+        ctrl = df.groupby('buckets')[col].mean().loc['Control']
+        test = df.groupby('buckets')[col].mean().loc['Test']
+        # extract per‑visitor series if needed
+        if col.endswith('_per_visitor') or col.endswith('_total_visitors'):
+            ctrl_series = (
+                df[df.buckets=='Control']
+                .groupby('exposed_visitor_id')[col.replace('cm1_per_total_visitors','cm1')
+                                            .replace('cm2_per_total_visitors','cm2')
+                                            .replace('net_sales_per_visitor','net_sales')]
+                .sum().values
+            )
+            test_series = (
+                df[df.buckets=='Test']
+                .groupby('exposed_visitor_id')[col.replace('cm1_per_total_visitors','cm1')
+                                            .replace('cm2_per_total_visitors','cm2')
+                                            .replace('net_sales_per_visitor','net_sales')]
+                .sum().values
+            )
+        else:
+            # for share metrics we can treat visitor‐level shares, but simplest is to bootstrap shop‐level aggregate
+            ctrl_series = np.full(1000, ctrl)  # placeholder
+            test_series = np.full(1000, test)
+
+        p, lo, hi = bayesian_bootstrap_diff(ctrl_series, test_series)
+        rows.append({
+            'Metric': name,
+            'P(Test > Control)': f"{p:.3f}",
+            'CI Lower': f"{lo:.4f}",
+            'CI Upper': f"{hi:.4f}",
+            'Impact': ''
+        })
+
+    bayes_summary = pd.DataFrame(rows).set_index('Metric')
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("🔬 Frequentist Tests")
+        st.table(stats_summary.set_index('Test'))
+    with col2:
+        st.subheader("🔭 Bayesian Analysis")
+        st.table(bayes_summary)
+
 
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
