@@ -527,7 +527,11 @@ def main():
             f"{ctrl_cm2s:.2%} to {test_cm2s:.2%} (no tests on CM metrics)."
         )
         st.write(f"**Insight:** {paragraph}")
-    stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
+    stats_summary['Impact'] = [
+    f"€{int(net_sales_impact)}",
+    f"€{int(contr_cr)}",
+    f"€{int(contr_opc)}",
+    f"€{int(contr_aov)}"]
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
@@ -599,7 +603,7 @@ def main():
             'P(Test > Control)':      f"{p*100:.2f}%",
             'CI Lower':               f"{lo:.4f}",
             'CI Upper':               f"{hi:.4f}",
-            'Impact':                 f"{impact}"
+            'Impact':                 f"€{impact}"
         })
 
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
