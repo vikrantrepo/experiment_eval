@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.proportion import proportions_ztest
 from scipy.stats import norm
-import pymc3 as pm
-import arviz as az
 
 st.set_page_config(page_title="SQL Builder & Experiment Dashboard", layout="wide")
 st.title("🛠️ SQL Builder & 📊 Experiment Dashboard")
@@ -331,22 +329,6 @@ def mann_whitney_tests(df: pd.DataFrame):
     u_a, p_a = mannwhitneyu(t_a, c_a, alternative='two-sided')
     return (u_o, p_o), (u_a, p_a)
 
-# -------------------- BAYESIAN HELPER --------------------
-def bayesian_group_compare(test_vals, ctrl_vals, draws=2000, tune=1000):
-    with pm.Model() as model:
-        mu_ctrl = pm.Normal('mu_ctrl', mu=ctrl_vals.mean(), sd=ctrl_vals.std()*2)
-        mu_test = pm.Normal('mu_test',  mu=test_vals.mean(), sd=test_vals.std()*2)
-        sigma_ctrl = pm.HalfNormal('sigma_ctrl', sd=ctrl_vals.std()*2)
-        sigma_test = pm.HalfNormal('sigma_test', sd=test_vals.std()*2)
-        pm.Normal('obs_ctrl', mu=mu_ctrl, sd=sigma_ctrl, observed=ctrl_vals)
-        pm.Normal('obs_test',  mu=mu_test,  sd=sigma_test,  observed=test_vals)
-        delta = pm.Deterministic('delta', mu_test - mu_ctrl)
-        trace = pm.sample(draws=draws, tune=tune, target_accept=0.95, cores=1, progressbar=False)
-    summary = az.summary(trace, var_names=['delta'], hdi_prob=0.95)
-    prob  = (trace['delta'] > 0).mean()
-    hdi    = az.hdi(trace['delta'], hdi_prob=0.95)
-    return summary.loc['delta','mean'], prob, hdi[0], hdi[1]
-
 # -------------------- VISUALIZATION HELPERS --------------------
 def show_visuals(df: pd.DataFrame, index_col: str):
     cols = ['conversion_rate_diff_bps', 'net_sales_per_visitor_abs_diff', 'net_aov_rel_diff', 'orders_per_converter_rel_diff']
@@ -545,47 +527,8 @@ def main():
         )
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
-	
-    visitor_summary = (
-        df.groupby(['buckets','exposed_visitor_id'])
-        .agg(revenue=('net_sales','sum'),cm1_sum=('cm1','sum'),cm2_sum=('cm2','sum'))
-        .reset_index()
-    )
-    visitor_summary['cm1_share'] = visitor_summary['cm1_sum'] / visitor_summary['revenue'].replace(0, np.nan)
-    visitor_summary['cm2_share'] = visitor_summary['cm2_sum'] / visitor_summary['revenue'].replace(0, np.nan)
-    to_model = [
-        ('revenue','Net Sales per Visitor'),('cm1_sum','CM1 per Visitor'),
-        ('cm2_sum','CM2 per Visitor'),('cm1_share','CM1 Share'),('cm2_share','CM2 Share')
-    ]
-    bayes_res = []
-    for col, label in to_model:
-        arr = visitor_summary.pivot(
-            index='exposed_visitor_id', columns='buckets', values=col
-        )
-        test_vals = arr['Test'].dropna().values
-        ctrl_vals = arr['Control'].dropna().values
-        if len(test_vals) < 2 or len(ctrl_vals) < 2:
-            continue
-        mean_diff, prob, lo, hi = bayesian_group_compare(test_vals, ctrl_vals)
-        bayes_res.append({
-            'Metric': label,
-            'Statistic': f"{mean_diff:.4f}",
-            'P(Test>Control)': f"{prob:.3f}",
-            'CI Lower': lo,
-            'CI Upper': hi,
-            'Impact': ''
-        })
-    bayes_df = pd.DataFrame(bayes_res).set_index('Metric')
-
-    # Display summaries
-    c1, c2 = st.columns(2)
-    with c1:
-        st.subheader("🔬 Statistical Tests Summary")
-        st.table(stats_summary.set_index('Test'))
-    with c2:
-        st.subheader("🔎 Bayesian Analysis (PyMC3)")
-        st.table(bayes_df)
-
+    st.subheader("🔬 Statistical Tests Summary")
+    st.table(stats_summary.set_index('Test'))
 
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
