@@ -511,6 +511,42 @@ def main():
     'CM2 Share of Net Sales':'cm2_per_total_net_sales'
     }
 
+    rows = []
+    for name, col in metrics.items():
+        ctrl = df.groupby('buckets')[col].mean().loc['Control']
+        test = df.groupby('buckets')[col].mean().loc['Test']
+        # extract per‑visitor series if needed
+        if col.endswith('_per_visitor') or col.endswith('_total_visitors'):
+            ctrl_series = (
+                df[df.buckets=='Control']
+                .groupby('exposed_visitor_id')[col.replace('cm1_per_total_visitors','cm1')
+                                            .replace('cm2_per_total_visitors','cm2')
+                                            .replace('net_sales_per_visitor','net_sales')]
+                .sum().values
+            )
+            test_series = (
+                df[df.buckets=='Test']
+                .groupby('exposed_visitor_id')[col.replace('cm1_per_total_visitors','cm1')
+                                            .replace('cm2_per_total_visitors','cm2')
+                                            .replace('net_sales_per_visitor','net_sales')]
+                .sum().values
+            )
+        else:
+            # for share metrics we can treat visitor‐level shares, but simplest is to bootstrap shop‐level aggregate
+            ctrl_series = np.full(1000, ctrl)  # placeholder
+            test_series = np.full(1000, test)
+
+        p, lo, hi = bayesian_bootstrap_diff(ctrl_series, test_series)
+        rows.append({
+            'Metric': name,
+            'P(Test > Control)': f"{p:.3f}",
+            'CI Lower': f"{lo:.4f}",
+            'CI Upper': f"{hi:.4f}",
+            'Impact': ''
+        })
+
+    bayes_summary = pd.DataFrame(rows).set_index('Metric')
+
     # --- new conditional Insight ---
     alpha = 0.05
     if p_boot < alpha:
