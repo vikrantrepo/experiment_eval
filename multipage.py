@@ -531,51 +531,59 @@ def main():
     st.subheader("🔬 Statistical Tests Summary")
     st.table(stats_summary.set_index('Test'))
 
+    # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
+
     def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
-        """Return posterior draws of Test–Control via Bayesian bootstrap."""
         rng = np.random.default_rng()
         diffs = []
-        n_c, n_t = len(ctrl_vals), len(test_vals)
         for _ in range(n_iters):
-            w_c = rng.dirichlet(np.ones(n_c))
-            w_t = rng.dirichlet(np.ones(n_t))
+            w_c = rng.dirichlet(np.ones(len(ctrl_vals)))
+            w_t = rng.dirichlet(np.ones(len(test_vals)))
             diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
         diffs = np.array(diffs)
-        lower, upper = np.percentile(diffs, [(1 - cred_mass) / 2 * 100, (1 + cred_mass) / 2 * 100])
-        prob = (diffs > 0).mean()  # Pr(Test > Control)
-        return prob, lower, upper
+        lo, hi = np.percentile(diffs, [(1-cred_mass)/2*100, (1+cred_mass)/2*100])
+        prob = (diffs > 0).mean()
+        return prob, lo, hi
 
     metrics = {
-    'Revenue per Visitor': 'net_sales_per_visitor',
-    'CM1 per Visitor':       'cm1_per_total_visitors',
-    'CM2 per Visitor':       'cm2_per_total_visitors',
-    'CM1 Share of Net Sales':'cm1_per_total_net_sales',
-    'CM2 Share of Net Sales':'cm2_per_total_net_sales'
+        'Revenue per Visitor':          'net_sales_per_visitor',
+        'CM1 per Visitor':              'cm1_per_total_visitors',
+        'CM2 per Visitor':              'cm2_per_total_visitors',
+        'CM1 Share of Net Sales':       'cm1_per_total_net_sales',
+        'CM2 Share of Net Sales':       'cm2_per_total_net_sales',
     }
 
     rows = []
+    # totals_df has exactly those columns
     for name, col in metrics.items():
-        ctrl = df.groupby('buckets')[col].mean().loc['Control']
-        test = df.groupby('buckets')[col].mean().loc['Test']
-        # extract per‑visitor series if needed
-        if col.endswith('_per_visitor') or col.endswith('_total_visitors'):
+        # point estimates
+        ctrl = totals_df.loc['Control', col]
+        test = totals_df.loc['Test', col]
+
+        # for bootstrap we need the raw per-visitor series:
+        #  - revenue: group df.net_sales by exposed_visitor_id
+        #  - cm1/cm2: group df.cm1 / df.cm2 by exposed_visitor_id
+        if col == 'net_sales_per_visitor':
             ctrl_series = (
                 df[df.buckets=='Control']
-                .groupby('exposed_visitor_id')[col.replace('cm1_per_total_visitors','cm1')
-                                            .replace('cm2_per_total_visitors','cm2')
-                                            .replace('net_sales_per_visitor','net_sales')]
-                .sum().values
+                  .groupby('exposed_visitor_id')['net_sales']
+                  .sum().values
             )
             test_series = (
                 df[df.buckets=='Test']
-                .groupby('exposed_visitor_id')[col.replace('cm1_per_total_visitors','cm1')
-                                            .replace('cm2_per_total_visitors','cm2')
-                                            .replace('net_sales_per_visitor','net_sales')]
-                .sum().values
+                  .groupby('exposed_visitor_id')['net_sales']
+                  .sum().values
             )
+        elif col == 'cm1_per_total_visitors':
+            ctrl_series = df[df.buckets=='Control'].groupby('exposed_visitor_id')['cm1'].sum().values
+            test_series = df[df.buckets=='Test'].groupby('exposed_visitor_id')['cm1'].sum().values
+        elif col == 'cm2_per_total_visitors':
+            ctrl_series = df[df.buckets=='Control'].groupby('exposed_visitor_id')['cm2'].sum().values
+            test_series = df[df.buckets=='Test'].groupby('exposed_visitor_id')['cm2'].sum().values
         else:
-            # for share metrics we can treat visitor‐level shares, but simplest is to bootstrap shop‐level aggregate
-            ctrl_series = np.full(1000, ctrl)  # placeholder
+            # for share metrics you can bootstrap the same series and transform
+            # or just approximate with point masses:
+            ctrl_series = np.full(1000, ctrl)
             test_series = np.full(1000, test)
 
         p, lo, hi = bayesian_bootstrap_diff(ctrl_series, test_series)
@@ -589,6 +597,7 @@ def main():
 
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
 
+    # render side‑by‑side
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🔬 Frequentist Tests")
@@ -597,59 +606,7 @@ def main():
         st.subheader("🔭 Bayesian Analysis")
         st.table(bayes_summary)
 
-    st.subheader("📈 Distribution and Boxplots")
-    df_lo = df[df['order_status'].isin(['L', 'O'])]
-    visitor_stats = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
-        total_sales=('net_sales', 'sum'),
-        order_count=('order_id', 'nunique')
-    ).assign(
-        net_aov=lambda x: x.total_sales / x.order_count,
-        orders_per_converted=lambda x: x.order_count
-    ).reset_index()
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        fig1, ax1 = plt.subplots(figsize=(4, 3))
-        ax1.hist(diffs, bins=50, alpha=0.7)
-        ax1.axvline(obs, linestyle='--')
-        ax1.axvline(ci_boot[0], linestyle=':')
-        ax1.axvline(ci_boot[1], linestyle=':')
-        ax1.set_title('Bootstrap Distribution')
-        st.pyplot(fig1)
-    with col2:
-        fig2, ax2 = plt.subplots(figsize=(4, 3))
-        visitor_stats.boxplot(column='net_aov', by='buckets', ax=ax2)
-        ax2.set_title('Net AOV by Bucket')
-        ax2.set_xlabel('')
-        ax2.set_ylabel('Net AOV')
-        plt.suptitle('')
-        st.pyplot(fig2)
-    with col3:
-        fig3, ax3 = plt.subplots(figsize=(4, 3))
-        visitor_stats.boxplot(column='order_count', by='buckets', ax=ax3)
-        ax3.set_title('Orders per Converted Visitor')
-        ax3.set_xlabel('')
-        ax3.set_ylabel('Orders per Visitor')
-        plt.suptitle('')
-        st.pyplot(fig3)
-
-    shop_metrics = compute_bucket_metrics_by_level(df, 'shop')
-    device_metrics = compute_bucket_metrics_by_level(df, 'device_platform')
-    shop_pivot = pivot_metrics(shop_metrics, 'shop').sort_values('total_visitors_Test', ascending=False)
-    device_pivot = pivot_metrics(device_metrics, 'device_platform').sort_values('total_visitors_Test', ascending=False)
-
-    st.subheader("🛒 Shop-Level Metrics")
-    st.dataframe(shop_pivot.reset_index(drop=True), use_container_width=True)
-
-    st.subheader("📱 Device-Level Metrics")
-    st.dataframe(device_pivot.reset_index(drop=True), use_container_width=True)
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("📊 Shop-Level Visuals")
-        show_visuals(shop_pivot, 'shop')
-    with col2:
-        st.subheader("📊 Device-Level Visuals")
-        show_visuals(device_pivot, 'device_platform')
+    # ────────────────────────────────────────────────────────────────────────
 
     def compute_contribs(df, segment_col):
         df = df.copy()
