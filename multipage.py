@@ -7,6 +7,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.proportion import proportions_ztest
 from scipy.stats import norm
+import pymc3 as pm
+import arviz as az
 
 st.set_page_config(page_title="SQL Builder & Experiment Dashboard", layout="wide")
 st.title("🛠️ SQL Builder & 📊 Experiment Dashboard")
@@ -528,8 +530,7 @@ def main():
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
 	
-	import pymc3 as pm
-	import arviz as az
+	
 	
 	# --- Formal Bayesian analysis for selected metrics ---
 	# Helper to run a Bayesian model comparing two groups
