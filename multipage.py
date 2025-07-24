@@ -530,7 +530,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=100000, cred_mass=0.95):
         rng = np.random.default_rng()
         diffs = []
         for _ in range(n_iters):
@@ -584,12 +584,21 @@ def main():
             test_series = np.full(1000, test)
 
         p, lo, hi = bayesian_bootstrap_diff(ctrl_series, test_series)
+        # compute impact (integer)
+        diff = test - ctrl
+        if name == 'Revenue per Visitor':
+            impact = int(diff * total_vis_test)
+        elif name in ('CM1 per Visitor', 'CM2 per Visitor'):
+            impact = int(diff * total_vis_test)
+        else:  # CM1/CM2 share of net sales
+            impact = int(diff * total_sales_test)
+
         rows.append({
             'Metric': name,
-            'P(Test > Control)': f"{p:.3f}",
-            'CI Lower': f"{lo:.4f}",
-            'CI Upper': f"{hi:.4f}",
-            'Impact': ''
+            'P(Test > Control)':      f"{p*100:.2f}%",
+            'CI Lower':               f"{lo:.4f}",
+            'CI Upper':               f"{hi:.4f}",
+            'Impact':                 f"{impact}"
         })
 
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
