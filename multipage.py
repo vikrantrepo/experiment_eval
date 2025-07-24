@@ -206,9 +206,9 @@ def load_and_clean(path: str) -> pd.DataFrame:
 # -------------------- METRICS FUNCTIONS --------------------
 def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
     total_visitors = grp['exposed_visitor_id'].nunique()
-    converters = grp[(grp['order_id'] > 1) & grp['order_status'].isin(['L', 'O'])]['exposed_visitor_id'].nunique()
+    converters_L = grp[(grp['order_id'] > 1) & grp['order_status'].isin(['L'])]['exposed_visitor_id'].nunique()
     orders_all = grp[grp['order_id'] > 1]['order_id'].nunique()
-    orders_lo = grp[grp['order_status'].isin(['L', 'O'])]['order_id'].nunique()
+    orders_l = grp[grp['order_status'].isin(['L'])]['order_id'].nunique()
     sales_sum = grp['net_sales'].sum()
     cancels = grp[grp['order_status'] == 'S']['order_id'].nunique()
     denom = orders_all if orders_all > 0 else None
@@ -223,12 +223,12 @@ def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
 
     return {
         'total_visitors': total_visitors,
-        'converting_visitors': converters,
-        'conversion_rate': round(converters/total_visitors, 4) if total_visitors else 0,
+        'converting_visitors': converters_L,
+        'conversion_rate': round(converters_L/total_visitors, 4) if total_visitors else 0,
         'orders_all': orders_all,
-        'orders_L_O': orders_lo,
-        'net_aov': round(sales_sum/orders_lo, 4) if orders_lo else 0,
-        'orders_per_converting_visitor': round(orders_lo/converters, 4) if converters else 0,
+        'orders_L': orders_l,
+        'net_aov': round(sales_sum/orders_l, 4) if orders_l else 0,
+        'orders_per_converting_visitor': round(orders_l/converters_L, 4) if converters_L else 0,
         'share_of_cancelled_orders': round(cancels/denom, 4) if denom else 0,
         'net_sales_per_visitor': round(sales_sum/total_visitors, 4) if total_visitors else 0,
         'total_net_sales': round(sales_sum, 2),
