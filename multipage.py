@@ -282,7 +282,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     })
 
 # -------------------- STATISTICAL TESTS --------------------
-def bootstrap_rpev(df: pd.DataFrame, n_iters=1000):
+def bootstrap_rpev(df: pd.DataFrame, n_iters=10000):
     visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
     test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
     ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
@@ -535,7 +535,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=1000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
         rng = np.random.default_rng()
         # 1) draw all Dirichlet weights in one go
         Wc = rng.dirichlet(np.ones(len(ctrl_vals)), size=n_iters)
