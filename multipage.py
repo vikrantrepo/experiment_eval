@@ -517,14 +517,30 @@ def main():
         sig_cr  = "significant" if p_z    < alpha else "not significant"
         sig_aov = "significant" if p_a    < alpha else "not significant"
 
+        ctrl_cm1_series = df[df.buckets=='Control'].groupby('exposed_visitor_id')['cm1'].sum().values
+        test_cm1_series = df[df.buckets=='Test'].groupby('exposed_visitor_id')['cm1'].sum().values
+        p_cm1, lo_cm1, hi_cm1 = bayesian_bootstrap_diff(ctrl_cm1_series, test_cm1_series)
+        sig_cm1 = "significant" if p_cm1 > 0.95 else "not significant"
+
+        # CM2 per visitor series
+        ctrl_cm2_series = df[df.buckets=='Control'].groupby('exposed_visitor_id')['cm2'].sum().values
+        test_cm2_series = df[df.buckets=='Test'].groupby('exposed_visitor_id')['cm2'].sum().values
+        p_cm2, lo_cm2, hi_cm2 = bayesian_bootstrap_diff(ctrl_cm2_series, test_cm2_series)
+        sig_cm2 = "significant" if p_cm2 > 0.95 else "not significant"
+
         paragraph = (
             f"Revenue per visitor changed from €{ctrl_nspv:.2f} to €{test_nspv:.2f} "
             f"(p = {p_boot:.3f}, {sig_rpv}); conversion rate from {ctrl_cr:.2%} to {test_cr:.2%} "
             f"(p = {p_z:.3f}, {sig_cr}); net AOV from €{ctrl_aov:.2f} to €{test_aov:.2f} "
-            f"(p = {p_a:.3f}, {sig_aov}). CM1 per visitor moved from €{ctrl_cm1v:.2f} to €{test_cm1v:.2f} "
-            f"(no test), and CM2 per visitor from €{ctrl_cm2v:.2f} to €{test_cm2v:.2f} (no test). "
+            f"(p = {p_a:.3f}, {sig_aov}). "
+            f"CM1 per visitor moved from €{ctrl_cm1v:.2f} to €{test_cm1v:.2f} "
+            f"(Bayesian p = {p_cm1:.3f}, {sig_cm1}); and CM2 per visitor from €{ctrl_cm2v:.2f} to €{test_cm2v:.2f} "
+            f"(Bayesian p = {p_cm2:.3f}, {sig_cm2}). "
             f"By net sales, CM1 went from {ctrl_cm1s:.2%} to {test_cm1s:.2%}, and CM2 from "
-            f"{ctrl_cm2s:.2%} to {test_cm2s:.2%} (no tests on CM metrics)."
+            f"{ctrl_cm2s:.2%} to {test_cm2s:.2%} (Bayesian p = {bayes_summary.loc['CM1 Share of Net Sales','P(Test > Control)']}, "
+            f"{'significant' if float(bayes_summary.loc['CM1 Share of Net Sales','P(Test > Control)'].strip('%'))>95 else 'not significant'}; "
+            f"Bayesian p = {bayes_summary.loc['CM2 Share of Net Sales','P(Test > Control)']}, "
+            f"{'significant' if float(bayes_summary.loc['CM2 Share of Net Sales','P(Test > Control)'].strip('%'))>95 else 'not significant'})."
         )
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [
