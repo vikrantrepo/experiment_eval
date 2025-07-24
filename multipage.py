@@ -546,54 +546,46 @@ def main():
         st.write(f"**Insight:** {paragraph}")
     stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
 	
-	
-	# Aggregate per-visitor metrics
-	visitor_summary = df.groupby(['buckets', 'exposed_visitor_id']).agg(
-	    revenue=('net_sales', 'sum'),
-	    cm1_sum=('cm1', 'sum'),
-	    cm2_sum=('cm2', 'sum'),
-	).reset_index()
-	# Compute share columns safely
+    visitor_summary = (
+        df.groupby(['buckets','exposed_visitor_id'])
+        .agg(revenue=('net_sales','sum'),cm1_sum=('cm1','sum'),cm2_sum=('cm2','sum'))
+        .reset_index()
+    )
     visitor_summary['cm1_share'] = visitor_summary['cm1_sum'] / visitor_summary['revenue'].replace(0, np.nan)
-	visitor_summary['cm2_share'] = visitor_summary['cm2_sum'] / visitor_summary['revenue'].replace(0, np.nan)
-	
-	# Define metrics and labels
-	to_model = [
-	    ('revenue', 'Net Sales per Visitor'),
-	    ('cm1_sum', 'CM1 per Visitor'),
-	    ('cm2_sum', 'CM2 per Visitor'),
-	    ('cm1_share', 'CM1 Share of Net Sales'),
-	    ('cm2_share', 'CM2 Share of Net Sales'),
-	]
-	
-	# Run Bayesian models
-	bayes_results = []
-	for col, label in to_model:
-	    arr = visitor_summary.pivot(index='exposed_visitor_id', columns='buckets', values=col)
-	    test_vals = arr['Test'].dropna().values
-	    ctrl_vals = arr['Control'].dropna().values
-	    # Skip if no data
-	    if len(test_vals) < 2 or len(ctrl_vals) < 2:
-	        continue
-	    mean_diff, prob, lo, hi = bayesian_group_compare(test_vals, ctrl_vals, label)
-	    bayes_results.append({
-	        'Metric': label,
-	        'Statistic': f"{mean_diff:.4f}",
-	        'P(Test>Control)': f"{prob:.3f}",
-	        'CI Lower': lo,
-	        'CI Upper': hi,
-	        'Impact': ''
-	    })
-	bayes_df = pd.DataFrame(bayes_results).set_index('Metric')
-	
-	# Display alongside frequentist tests
-	col_stats, col_bayes = st.columns(2)
-	with col_stats:
-	    st.subheader("🔬 Statistical Tests Summary")
-	    st.table(stats_summary.set_index('Test'))
-	with col_bayes:
-	    st.subheader("🔎 Bayesian Analysis Summary (PyMC3)")
-	    st.table(bayes_df)
+    visitor_summary['cm2_share'] = visitor_summary['cm2_sum'] / visitor_summary['revenue'].replace(0, np.nan)
+    to_model = [
+        ('revenue','Net Sales per Visitor'),('cm1_sum','CM1 per Visitor'),
+        ('cm2_sum','CM2 per Visitor'),('cm1_share','CM1 Share'),('cm2_share','CM2 Share')
+    ]
+    bayes_res = []
+    for col, label in to_model:
+        arr = visitor_summary.pivot(
+            index='exposed_visitor_id', columns='buckets', values=col
+        )
+        test_vals = arr['Test'].dropna().values
+        ctrl_vals = arr['Control'].dropna().values
+        if len(test_vals) < 2 or len(ctrl_vals) < 2:
+            continue
+        mean_diff, prob, lo, hi = bayesian_group_compare(test_vals, ctrl_vals)
+        bayes_res.append({
+            'Metric': label,
+            'Statistic': f"{mean_diff:.4f}",
+            'P(Test>Control)': f"{prob:.3f}",
+            'CI Lower': lo,
+            'CI Upper': hi,
+            'Impact': ''
+        })
+    bayes_df = pd.DataFrame(bayes_res).set_index('Metric')
+
+    # Display summaries
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("🔬 Statistical Tests Summary")
+        st.table(stats_summary.set_index('Test'))
+    with c2:
+        st.subheader("🔎 Bayesian Analysis (PyMC3)")
+        st.table(bayes_df)
+
 
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
