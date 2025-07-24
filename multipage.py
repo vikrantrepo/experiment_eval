@@ -607,6 +607,59 @@ def main():
         st.table(bayes_summary)
 
     # ────────────────────────────────────────────────────────────────────────
+    st.subheader("📈 Distribution and Boxplots")
+    df_lo = df[df['order_status'].isin(['L', 'O'])]
+    visitor_stats = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
+        total_sales=('net_sales', 'sum'),
+        order_count=('order_id', 'nunique')
+    ).assign(
+        net_aov=lambda x: x.total_sales / x.order_count,
+        orders_per_converted=lambda x: x.order_count
+    ).reset_index()
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        fig1, ax1 = plt.subplots(figsize=(4, 3))
+        ax1.hist(diffs, bins=50, alpha=0.7)
+        ax1.axvline(obs, linestyle='--')
+        ax1.axvline(ci_boot[0], linestyle=':')
+        ax1.axvline(ci_boot[1], linestyle=':')
+        ax1.set_title('Bootstrap Distribution')
+        st.pyplot(fig1)
+    with col2:
+        fig2, ax2 = plt.subplots(figsize=(4, 3))
+        visitor_stats.boxplot(column='net_aov', by='buckets', ax=ax2)
+        ax2.set_title('Net AOV by Bucket')
+        ax2.set_xlabel('')
+        ax2.set_ylabel('Net AOV')
+        plt.suptitle('')
+        st.pyplot(fig2)
+    with col3:
+        fig3, ax3 = plt.subplots(figsize=(4, 3))
+        visitor_stats.boxplot(column='order_count', by='buckets', ax=ax3)
+        ax3.set_title('Orders per Converted Visitor')
+        ax3.set_xlabel('')
+        ax3.set_ylabel('Orders per Visitor')
+        plt.suptitle('')
+        st.pyplot(fig3)
+
+    shop_metrics = compute_bucket_metrics_by_level(df, 'shop')
+    device_metrics = compute_bucket_metrics_by_level(df, 'device_platform')
+    shop_pivot = pivot_metrics(shop_metrics, 'shop').sort_values('total_visitors_Test', ascending=False)
+    device_pivot = pivot_metrics(device_metrics, 'device_platform').sort_values('total_visitors_Test', ascending=False)
+
+    st.subheader("🛒 Shop-Level Metrics")
+    st.dataframe(shop_pivot.reset_index(drop=True), use_container_width=True)
+
+    st.subheader("📱 Device-Level Metrics")
+    st.dataframe(device_pivot.reset_index(drop=True), use_container_width=True)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("📊 Shop-Level Visuals")
+        show_visuals(shop_pivot, 'shop')
+    with col2:
+        st.subheader("📊 Device-Level Visuals")
+        show_visuals(device_pivot, 'device_platform')
 
     def compute_contribs(df, segment_col):
         df = df.copy()
