@@ -598,15 +598,15 @@ def main():
 
     insight_frequentist = (
         f"**Net revenue per visitor** changed by **€{delta_nspv:.2f} / {rel_nspv:+.2f}%** "
-        f"(Control: €{ctrl_nspv:.2f}, Test: €{test_nspv:.2f}) "
+        f"(C: €{ctrl_nspv:.2f}, T: €{test_nspv:.2f}) "
         f"(p={p_boot:.3f}, {sig_nrpv}). "
         f"NRPV components: "
         f"**Conversion rate** changed by **{delta_cr:.2%} / {rel_cr:+.2f}%** "
-        f"(Control: {ctrl_cr:.2%}, Test: {test_cr:.2%}) (p={p_z:.3f}, {sig_cr}), "
+        f"(C: {ctrl_cr:.2%}, T: {test_cr:.2%}) (p={p_z:.3f}, {sig_cr}), "
         f"**Orders per converter** changed by **{delta_opc:.4f} / {rel_opc:+.2f}%** "
-        f"(Control: {ctrl_opc:.4f}, Test: {test_opc:.4f}) (p={p_o:.3f}, {sig_opc}), "
+        f"(C: {ctrl_opc:.4f}, T: {test_opc:.4f}) (p={p_o:.3f}, {sig_opc}), "
         f"**Net AOV** changed by **€{delta_aov:.2f} / {rel_aov:+.2f}%** "
-        f"(Control: €{ctrl_aov:.2f}, Test: €{test_aov:.2f}) (p={p_a:.3f}, {sig_aov})."
+        f"(C: €{ctrl_aov:.2f}, T: €{test_aov:.2f}) (p={p_a:.3f}, {sig_aov})."
     )
 
     # --- Bayesian Insight ---
@@ -630,8 +630,8 @@ def main():
             val_fmt = lambda x: f"€{x:.4f}" if abs(x) < 100 else f"€{x:,.0f}"
             abs_fmt = lambda x: f"€{x:+.4f}" if abs(x) < 100 else f"€{x:+,.0f}"
         bayesian_metrics.append(
-            f"**{metric_name}** changed by **{abs_fmt(diff)} / {rel:+.2f}%** (Test: {val_fmt(test)}, Control: {val_fmt(ctrl)}), "
-            f"probability Test > Control: {prob}, impact: {impact}"
+            f"**{metric_name}** changed by **{abs_fmt(diff)} / {rel:+.2f}%** (T: {val_fmt(test)}, C: {val_fmt(ctrl)}), "
+            f"probability T > C: {prob}, impact: {impact}"
         )
 
     insight_bayesian = " | ".join(bayesian_metrics)
@@ -640,6 +640,7 @@ def main():
     st.markdown("### 🔎 Insight Summary")
     st.write(insight_frequentist)
     st.write(insight_bayesian)
+
 
 
     # render side‑by‑side
