@@ -489,6 +489,11 @@ def main():
     contributors = {'Conversion Rate': contr_cr, 'Orders per Converted Visitor': contr_opc, 'Net AOV': contr_aov}
     primary = max(contributors, key=lambda k: contributors[k]) if net_sales_impact >= 0 else min(contributors, key=lambda k: contributors[k])
     sign = 'positive' if net_sales_impact >= 0 else 'negative'
+    stats_summary['Impact'] = [
+    f"€{int(net_sales_impact)}",
+    f"€{int(contr_cr)}",
+    f"€{int(contr_opc)}",
+    f"€{int(contr_aov)}"]
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
