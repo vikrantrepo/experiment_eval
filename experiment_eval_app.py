@@ -1,6 +1,6 @@
 import streamlit as st
 import datetime
-import pandas as pd
+import pandas as pdo
 import numpy as np
 import altair as alt
 import matplotlib.pyplot as plt
@@ -206,9 +206,9 @@ def load_and_clean(path: str) -> pd.DataFrame:
 # -------------------- METRICS FUNCTIONS --------------------
 def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
     total_visitors = grp['exposed_visitor_id'].nunique()
-    converters = grp[(grp['order_id'] > 1) & grp['order_status'].isin(['L', 'O'])]['exposed_visitor_id'].nunique()
+    converters_L = grp[(grp['order_id'] > 1) & grp['order_status'].isin(['L'])]['exposed_visitor_id'].nunique()
     orders_all = grp[grp['order_id'] > 1]['order_id'].nunique()
-    orders_lo = grp[grp['order_status'].isin(['L', 'O'])]['order_id'].nunique()
+    orders_l = grp[grp['order_status'].isin(['L'])]['order_id'].nunique()
     sales_sum = grp['net_sales'].sum()
     cancels = grp[grp['order_status'] == 'S']['order_id'].nunique()
     denom = orders_all if orders_all > 0 else None
@@ -223,12 +223,12 @@ def compute_bucket_metrics(grp: pd.core.groupby.DataFrameGroupBy) -> dict:
 
     return {
         'total_visitors': total_visitors,
-        'converting_visitors': converters,
-        'conversion_rate': round(converters/total_visitors, 4) if total_visitors else 0,
+        'converting_visitors': converters_L,
+        'conversion_rate': round(converters_L/total_visitors, 4) if total_visitors else 0,
         'orders_all': orders_all,
-        'orders_L_O': orders_lo,
-        'net_aov': round(sales_sum/orders_lo, 4) if orders_lo else 0,
-        'orders_per_converting_visitor': round(orders_lo/converters, 4) if converters else 0,
+        'orders_L': orders_l,
+        'net_aov': round(sales_sum/orders_l, 4) if orders_l else 0,
+        'orders_per_converting_visitor': round(orders_l/converters_L, 4) if converters_L else 0,
         'share_of_cancelled_orders': round(cancels/denom, 4) if denom else 0,
         'net_sales_per_visitor': round(sales_sum/total_visitors, 4) if total_visitors else 0,
         'total_net_sales': round(sales_sum, 2),
@@ -282,12 +282,12 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     })
 
 # -------------------- STATISTICAL TESTS --------------------
-def bootstrap_rpev(df: pd.DataFrame, n_iters=10000, seed=42):
+def bootstrap_rpev(df: pd.DataFrame, n_iters=10000):
     visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
     test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
     ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
     obs = test.mean() - ctrl.mean()
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng()
     diffs = np.array([
         rng.choice(test, size=len(test), replace=True).mean() -
         rng.choice(ctrl, size=len(ctrl), replace=True).mean()
@@ -447,7 +447,7 @@ def main():
         'total_visitors': '{:,.0f}',
         'converting_visitors': '{:,.0f}',
         'orders_all': '{:,.0f}',
-        'orders_L_O': '{:,.0f}',
+        'orders_L': '{:,.0f}',
         'total_net_sales': '€{:,.0f}',
         'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
         'net_aov': lambda v: f"€{v:.2f}",
@@ -474,6 +474,7 @@ def main():
         { 'Test': 'Net AOV (Mann-Whitney)', 'Statistic': f"{u_a:.2f}", 'P-value': p_a, 'CI Lower': np.nan, 'CI Upper': np.nan, 'Significant': 'Yes' if p_a < 0.05 else 'No' }
     ])
     total_vis_test = totals_df.loc['Test','total_visitors']
+    total_sales_test = totals_df.loc['Test',    'total_net_sales'] 
     cr_c = totals_df.loc['Control','conversion_rate']
     opc_c = totals_df.loc['Control','orders_per_converting_visitor']
     aov_c = totals_df.loc['Control','net_aov']
@@ -526,10 +527,97 @@ def main():
             f"{ctrl_cm2s:.2%} to {test_cm2s:.2%} (no tests on CM metrics)."
         )
         st.write(f"**Insight:** {paragraph}")
-    stats_summary['Impact'] = [net_sales_impact, contr_cr, contr_opc, contr_aov]
-    st.subheader("🔬 Statistical Tests Summary")
-    st.table(stats_summary.set_index('Test'))
+    stats_summary['Impact'] = [
+    f"€{int(net_sales_impact)}",
+    f"€{int(contr_cr)}",
+    f"€{int(contr_opc)}",
+    f"€{int(contr_aov)}"]
 
+    # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
+
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+        rng = np.random.default_rng()
+        diffs = []
+        for _ in range(n_iters):
+            w_c = rng.dirichlet(np.ones(len(ctrl_vals)))
+            w_t = rng.dirichlet(np.ones(len(test_vals)))
+            diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
+        diffs = np.array(diffs)
+        lo, hi = np.percentile(diffs, [(1-cred_mass)/2*100, (1+cred_mass)/2*100])
+        prob = (diffs > 0).mean()
+        return prob, lo, hi
+
+    metrics = {
+        'Revenue per Visitor':          'net_sales_per_visitor',
+        'CM1 per Visitor':              'cm1_per_total_visitors',
+        'CM2 per Visitor':              'cm2_per_total_visitors',
+        'CM1 Share of Net Sales':       'cm1_per_total_net_sales',
+        'CM2 Share of Net Sales':       'cm2_per_total_net_sales',
+    }
+
+    rows = []
+    # totals_df has exactly those columns
+    for name, col in metrics.items():
+        # point estimates
+        ctrl = totals_df.loc['Control', col]
+        test = totals_df.loc['Test', col]
+
+        # for bootstrap we need the raw per-visitor series:
+        #  - revenue: group df.net_sales by exposed_visitor_id
+        #  - cm1/cm2: group df.cm1 / df.cm2 by exposed_visitor_id
+        if col == 'net_sales_per_visitor':
+            ctrl_series = (
+                df[df.buckets=='Control']
+                  .groupby('exposed_visitor_id')['net_sales']
+                  .sum().values
+            )
+            test_series = (
+                df[df.buckets=='Test']
+                  .groupby('exposed_visitor_id')['net_sales']
+                  .sum().values
+            )
+        elif col == 'cm1_per_total_visitors':
+            ctrl_series = df[df.buckets=='Control'].groupby('exposed_visitor_id')['cm1'].sum().values
+            test_series = df[df.buckets=='Test'].groupby('exposed_visitor_id')['cm1'].sum().values
+        elif col == 'cm2_per_total_visitors':
+            ctrl_series = df[df.buckets=='Control'].groupby('exposed_visitor_id')['cm2'].sum().values
+            test_series = df[df.buckets=='Test'].groupby('exposed_visitor_id')['cm2'].sum().values
+        else:
+            # for share metrics you can bootstrap the same series and transform
+            # or just approximate with point masses:
+            ctrl_series = np.full(1000, ctrl)
+            test_series = np.full(1000, test)
+
+        p, lo, hi = bayesian_bootstrap_diff(ctrl_series, test_series)
+        # compute impact (integer)
+        diff = test - ctrl
+        if name == 'Revenue per Visitor':
+            impact = int(diff * total_vis_test)
+        elif name in ('CM1 per Visitor', 'CM2 per Visitor'):
+            impact = int(diff * total_vis_test)
+        else:  # CM1/CM2 share of net sales
+            impact = int(diff * total_sales_test)
+
+        rows.append({
+            'Metric': name,
+            'P(Test > Control)':      f"{p*100:.2f}%",
+            'CI Lower':               f"{lo:.4f}",
+            'CI Upper':               f"{hi:.4f}",
+            'Impact':                 f"€{impact}"
+        })
+
+    bayes_summary = pd.DataFrame(rows).set_index('Metric')
+
+    # render side‑by‑side
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("🔬 Frequentist Tests")
+        st.table(stats_summary.set_index('Test'))
+    with col2:
+        st.subheader("🔭 Bayesian Analysis")
+        st.table(bayes_summary)
+
+    # ────────────────────────────────────────────────────────────────────────
     st.subheader("📈 Distribution and Boxplots")
     df_lo = df[df['order_status'].isin(['L', 'O'])]
     visitor_stats = df_lo.groupby(['buckets', 'exposed_visitor_id']).agg(
