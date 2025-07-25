@@ -571,6 +571,8 @@ def main():
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
 
     # render side‑by‑side
+
+    st.write("hello")
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🔬 Frequentist Tests")
