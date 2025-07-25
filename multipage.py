@@ -282,7 +282,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     })
 
 # -------------------- STATISTICAL TESTS --------------------
-def bootstrap_rpev(df: pd.DataFrame, n_iters=10000):
+def bootstrap_rpev(df: pd.DataFrame, n_iters=1000):
     visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
     test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
     ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
@@ -497,7 +497,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=1000, cred_mass=0.95):
         rng = np.random.default_rng()
         diffs = []
         for _ in range(n_iters):
@@ -570,9 +570,59 @@ def main():
 
     bayes_summary = pd.DataFrame(rows).set_index('Metric')
 
-    # render side‑by‑side
+    # --- Build and display Insight Summary ---
+    # --- Frequentist Insight ---
+    ctrl_nspv = totals_df.loc['Control','net_sales_per_visitor']
+    test_nspv = totals_df.loc['Test','net_sales_per_visitor']
+    delta_nspv = test_nspv - ctrl_nspv
+    sig_nrpv = "significant" if p_boot < 0.05 else "not significant"
 
-    st.write("hello")
+    ctrl_cr = totals_df.loc['Control','conversion_rate']
+    test_cr = totals_df.loc['Test','conversion_rate']
+    delta_cr = test_cr - ctrl_cr
+    sig_cr = "significant" if p_z < 0.05 else "not significant"
+
+    ctrl_opc = totals_df.loc['Control','orders_per_converting_visitor']
+    test_opc = totals_df.loc['Test','orders_per_converting_visitor']
+    delta_opc = test_opc - ctrl_opc
+    sig_opc = "significant" if p_o < 0.05 else "not significant"
+
+    ctrl_aov = totals_df.loc['Control','net_aov']
+    test_aov = totals_df.loc['Test','net_aov']
+    delta_aov = test_aov - ctrl_aov
+    sig_aov = "significant" if p_a < 0.05 else "not significant"
+
+    insight_frequentist = (
+        f"**Net revenue per visitor** changed by **€{delta_nspv:.2f}** (Control: €{ctrl_nspv:.2f}, Test: €{test_nspv:.2f}) "
+        f"(p={p_boot:.3f}, {sig_nrpv}). "
+        f"NRPV components: "
+        f"**Conversion rate** changed by **{delta_cr:.2%}** (Control: {ctrl_cr:.2%}, Test: {test_cr:.2%}) (p={p_z:.3f}, {sig_cr}), "
+        f"**Orders per converter** changed by **{delta_opc:.4f}** (Control: {ctrl_opc:.4f}, Test: {test_opc:.4f}) (p={p_o:.3f}, {sig_opc}), "
+        f"**Net AOV** changed by **€{delta_aov:.2f}** (Control: €{ctrl_aov:.2f}, Test: €{test_aov:.2f}) (p={p_a:.3f}, {sig_aov})."
+    )
+
+    # --- Bayesian Insight ---
+    bayesian_metrics = []
+    for metric_name, col in metrics.items():
+        ctrl = totals_df.loc['Control', col]
+        test = totals_df.loc['Test', col]
+        diff = test - ctrl
+        # The corresponding row in bayes_summary
+        prob = bayes_summary.loc[metric_name, 'P(Test > Control)']
+        impact = bayes_summary.loc[metric_name, 'Impact']
+        bayesian_metrics.append(
+            f"**{metric_name}** changed by **{diff:.4f}** (Test: {test:.4f}, Control: {ctrl:.4f}), "
+            f"probability Test > Control: {prob}, impact: {impact}"
+        )
+
+    insight_bayesian = " | ".join(bayesian_metrics)
+
+    # --- Display both insights ---
+    st.markdown("### 🔎 Insight Summary")
+    st.write(insight_frequentist)
+    st.write(insight_bayesian)
+
+    # render side‑by‑side
     col1, col2 = st.columns(2)
     with col1:
         st.subheader("🔬 Frequentist Tests")
