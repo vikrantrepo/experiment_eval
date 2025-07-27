@@ -7,9 +7,6 @@ import matplotlib.pyplot as plt
 from scipy.stats import mannwhitneyu
 from statsmodels.stats.proportion import proportions_ztest
 from scipy.stats import norm
-import pymc as pm
-import arviz as az
-
 
 st.set_page_config(page_title="SQL Builder & Experiment Dashboard", layout="wide")
 st.title("🛠️ SQL Builder & 📊 Experiment Dashboard")
@@ -417,7 +414,7 @@ def main():
     diff = pd.Series(index=totals_df.columns, name='Ab. Delta')
     cr_test = totals_df.loc['Test', 'conversion_rate']
     cr_ctrl = totals_df.loc['Control', 'conversion_rate']	
-    diff['conversion_rate'] = (cr_test - cr_ctrl) * 10000
+    diff['conversion_rate'] = f"{int(round((cr_test - cr_ctrl) * 10000, 0))} bps"
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
     diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
@@ -426,7 +423,7 @@ def main():
     for m in [ 'cm1_per_total_net_sales', 'cm2_per_total_net_sales']:
         test_v = totals_df.loc['Test', m]
         ctrl_v = totals_df.loc['Control', m]
-        diff[m] = round(test_v - ctrl_v, 4) 
+        diff[m] = f"{abs(round((test_v - ctrl_v)*100, 2))}%"
     totals_with_diff = totals_df.copy()
     totals_with_diff.loc['Absolute Difference'] = diff
     color_metrics = [
@@ -452,7 +449,7 @@ def main():
         'orders_all': '{:,.0f}',
         'orders_L': '{:,.0f}',
         'total_net_sales': '€{:,.0f}',
-        'conversion_rate': lambda v: f"{v:.0f} bps" if isinstance(v, (int, float, np.floating)) else v,
+        'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
         'net_aov': lambda v: f"€{v:.2f}",
         'orders_per_converting_visitor': '{:.4f}',
         'share_of_cancelled_orders': '{:.2%}',
@@ -500,57 +497,17 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def hurdle_studentt_diff(ctrl_vals, test_vals, draws=300, tune=200):
-        ctrl = np.asarray(ctrl_vals)
-        test = np.asarray(test_vals)
-
-        # Zero vs non‑zero indicators
-        z_ctrl = (ctrl != 0).astype(int)
-        z_test = (test != 0).astype(int)
-        pos_ctrl = ctrl[z_ctrl == 1]
-        pos_test = test[z_test == 1]
-
-        # Defensive: minimum scale for priors
-        prior_scale_c = max(pos_ctrl.std(), 1e-3) if len(pos_ctrl) > 1 else 1.0
-        prior_scale_t = max(pos_test.std(), 1e-3) if len(pos_test) > 1 else 1.0
-
-        with pm.Model() as model:
-            π_c = pm.Beta("π_c", 1, 1)
-            π_t = pm.Beta("π_t", 1, 1)
-            pm.Bernoulli("Z_c", p=π_c, observed=z_ctrl)
-            pm.Bernoulli("Z_t", p=π_t, observed=z_test)
-
-            μ_c = pm.Normal("μ_c", mu=pos_ctrl.mean() if len(pos_ctrl) else 0.0, sigma=prior_scale_c * 10)
-            σ_c = pm.HalfNormal("σ_c", sigma=prior_scale_c * 10)
-            ν_c = pm.Exponential("ν_c", 1/30)
-            μ_t = pm.Normal("μ_t", mu=pos_test.mean() if len(pos_test) else 0.0, sigma=prior_scale_t * 10)
-            σ_t = pm.HalfNormal("σ_t", sigma=prior_scale_t * 10)
-            ν_t = pm.Exponential("ν_t", 1/30)
-
-            if len(pos_ctrl):
-                pm.StudentT("Y_c", nu=ν_c, mu=μ_c, sigma=σ_c, observed=pos_ctrl)
-            if len(pos_test):
-                pm.StudentT("Y_t", nu=ν_t, mu=μ_t, sigma=σ_t, observed=pos_test)
-
-            m_c = pm.Deterministic("m_c", π_c * μ_c)
-            m_t = pm.Deterministic("m_t", π_t * μ_t)
-            delta = pm.Deterministic("delta", m_t - m_c)
-
-            trace = pm.sample(
-                draws=draws,
-                tune=tune,
-                chains=2,
-                cores=2,
-                progressbar=True,
-                return_inferencedata=True
-            )
-
-        post = trace.posterior["delta"].values.flatten()
-        prob = (post > 0).mean()
-        hdi = az.hdi(post, hdi_prob=0.95)
-        return prob, float(hdi[0]), float(hdi[1])
-
-
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=1000, cred_mass=0.95):
+        rng = np.random.default_rng()
+        diffs = []
+        for _ in range(n_iters):
+            w_c = rng.dirichlet(np.ones(len(ctrl_vals)))
+            w_t = rng.dirichlet(np.ones(len(test_vals)))
+            diffs.append((test_vals * w_t).sum() - (ctrl_vals * w_c).sum())
+        diffs = np.array(diffs)
+        lo, hi = np.percentile(diffs, [(1-cred_mass)/2*100, (1+cred_mass)/2*100])
+        prob = (diffs > 0).mean()
+        return prob, lo, hi
 
     metrics = {
         'Revenue per Visitor':          'net_sales_per_visitor',
@@ -593,7 +550,7 @@ def main():
             ctrl_series = np.full(1000, ctrl)
             test_series = np.full(1000, test)
 
-        p, lo, hi = hurdle_studentt_diff(ctrl_series, test_series)
+        p, lo, hi = bayesian_bootstrap_diff(ctrl_series, test_series)
         # compute impact (integer)
         diff = test - ctrl
         if name == 'Revenue per Visitor':
