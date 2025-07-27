@@ -500,45 +500,59 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def pymc_diff(ctrl_vals, test_vals, draws=1000, tune=500, target_accept=0.9):
+    def hurdle_studentt_diff(ctrl_vals, test_vals, draws=1000, tune=500):
+        """
+        Bayesian hurdle model with:
+        - Bernoulli for mass at zero
+        - Student‑t for the non‑zero values
+        Returns: P(Test > Control), 95% HDI lower, 95% HDI upper
+        """
         ctrl = np.asarray(ctrl_vals)
         test = np.asarray(test_vals)
 
-        # Quick exit on zero‐variance data
-        if np.isclose(ctrl.std(), 0) or np.isclose(test.std(), 0):
-            diff = np.mean(test) - np.mean(ctrl)
-            if diff > 0:
-                return 1.0, diff, diff
-            elif diff < 0:
-                return 0.0, diff, diff
-            else:
-                return 0.5, diff, diff
+        # Zero vs non‑zero indicators
+        z_ctrl = (ctrl != 0).astype(int)
+        z_test = (test != 0).astype(int)
+        pos_ctrl = ctrl[z_ctrl == 1]
+        pos_test = test[z_test == 1]
 
         with pm.Model() as model:
-            mu_c = pm.Normal("mu_c", mu=ctrl.mean(), sigma=ctrl.std() * 10)
-            sigma_c = pm.HalfNormal("sigma_c", sigma=ctrl.std() * 10)
-            mu_t = pm.Normal("mu_t", mu=test.mean(), sigma=test.std() * 10)
-            sigma_t = pm.HalfNormal("sigma_t", sigma=test.std() * 10)
+            # 1) Zero‐hurdle
+            π_c = pm.Beta("π_c", 1, 1)
+            π_t = pm.Beta("π_t", 1, 1)
+            pm.Bernoulli("Z_c", p=π_c, observed=z_ctrl)
+            pm.Bernoulli("Z_t", p=π_t, observed=z_test)
 
-            pm.Normal("obs_c", mu=mu_c, sigma=sigma_c, observed=ctrl)
-            pm.Normal("obs_t", mu=mu_t, sigma=sigma_t, observed=test)
-            delta = pm.Deterministic("delta", mu_t - mu_c)
+            # 2) Student‑t on non‑zeros
+            μ_c = pm.Normal("μ_c", mu=pos_ctrl.mean(), sigma=abs(pos_ctrl.std()) * 10)
+            σ_c = pm.HalfNormal("σ_c", sigma=abs(pos_ctrl.std()) * 10)
+            ν_c = pm.Exponential("ν_c", 1/30)
+            μ_t = pm.Normal("μ_t", mu=pos_test.mean(), sigma=abs(pos_test.std()) * 10)
+            σ_t = pm.HalfNormal("σ_t", sigma=abs(pos_test.std()) * 10)
+            ν_t = pm.Exponential("ν_t", 1/30)
+
+            pm.StudentT("Y_c", nu=ν_c, mu=μ_c, sigma=σ_c, observed=pos_ctrl)
+            pm.StudentT("Y_t", nu=ν_t, mu=μ_t, sigma=σ_t, observed=pos_test)
+
+            # 3) Unconditional means: π * μ
+            m_c = pm.Deterministic("m_c", π_c * μ_c)
+            m_t = pm.Deterministic("m_t", π_t * μ_t)
+            delta = pm.Deterministic("delta", m_t - m_c)
 
             trace = pm.sample(
                 draws=draws,
                 tune=tune,
-                target_accept=target_accept,
                 chains=2,
                 cores=1,
                 progressbar=False,
                 return_inferencedata=True
             )
 
-        posterior = trace.posterior["delta"].values.flatten()
-        prob = (posterior > 0).mean()
-        hdi_bounds = az.hdi(posterior, hdi_prob=0.95)  # 2‐element array
-        lower, upper = float(hdi_bounds[0]), float(hdi_bounds[1])
-        return prob, lower, upper
+        post = trace.posterior["delta"].values.flatten()
+        prob = (post > 0).mean()
+        hdi = az.hdi(post, hdi_prob=0.95)  # returns array([lower, upper])
+        return prob, float(hdi[0]), float(hdi[1])
+
 
 
     metrics = {
