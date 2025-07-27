@@ -646,7 +646,7 @@ def main():
     test_nspv = totals_df.loc['Test',    'net_sales_per_visitor']
     delta_nspv = test_nspv - ctrl_nspv
     if delta_nspv < 0:
-        loss = -delta_nspv
+        loss = delta_nspv
 
         # 2) required full‐offset CMx
         ctrl_cm1 = totals_df.loc['Control', 'cm1_per_total_visitors']
