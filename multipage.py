@@ -504,6 +504,16 @@ def main():
         ctrl = np.asarray(ctrl_vals)
         test = np.asarray(test_vals)
 
+        # Quick exit on zero‐variance data
+        if np.isclose(ctrl.std(), 0) or np.isclose(test.std(), 0):
+            diff = np.mean(test) - np.mean(ctrl)
+            if diff > 0:
+                return 1.0, diff, diff
+            elif diff < 0:
+                return 0.0, diff, diff
+            else:
+                return 0.5, diff, diff
+
         with pm.Model() as model:
             mu_c = pm.Normal("mu_c", mu=ctrl.mean(), sigma=ctrl.std() * 10)
             sigma_c = pm.HalfNormal("sigma_c", sigma=ctrl.std() * 10)
@@ -518,21 +528,16 @@ def main():
                 draws=draws,
                 tune=tune,
                 target_accept=target_accept,
+                chains=2,
                 cores=1,
                 progressbar=False,
                 return_inferencedata=True
             )
 
-        # Extract posterior samples
         posterior = trace.posterior["delta"].values.flatten()
         prob = (posterior > 0).mean()
-
-        # Compute HDI from the flat array
-        hdi_bounds = az.hdi(posterior, hdi_prob=0.95)  # returns a 2‑element np.array
-        lower = float(hdi_bounds[0])
-        upper = float(hdi_bounds[1])
-
-        # **Return** numerical values directly—no .sel calls
+        hdi_bounds = az.hdi(posterior, hdi_prob=0.95)  # 2‐element array
+        lower, upper = float(hdi_bounds[0]), float(hdi_bounds[1])
         return prob, lower, upper
 
 
