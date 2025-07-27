@@ -426,7 +426,7 @@ def main():
     for m in [ 'cm1_per_total_net_sales', 'cm2_per_total_net_sales']:
         test_v = totals_df.loc['Test', m]
         ctrl_v = totals_df.loc['Control', m]
-        diff[m] = f"{abs(round((test_v - ctrl_v)*100, 2))}%"
+        diff[m] = round(test_v - ctrl_v, 4) 
     totals_with_diff = totals_df.copy()
     totals_with_diff.loc['Absolute Difference'] = diff
     color_metrics = [
