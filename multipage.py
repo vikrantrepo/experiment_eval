@@ -642,6 +642,26 @@ def main():
     st.write(insight_bayesian)
 
 
+    delta_nspv = totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor']
+    if delta_nspv < 0:
+        # Control (breakeven) values
+        breakeven_cm1 = totals_df.loc['Control','cm1_per_total_visitors']
+        breakeven_cm2 = totals_df.loc['Control','cm2_per_total_visitors']
+        # Test (actual) values
+        actual_cm1 = totals_df.loc['Test','cm1_per_total_visitors']
+        actual_cm2 = totals_df.loc['Test','cm2_per_total_visitors']
+        # Gaps
+        gap_cm1 = actual_cm1 - breakeven_cm1
+        gap_cm2 = actual_cm2 - breakeven_cm2
+
+        st.markdown("**⚖️ Breakeven vs. Actual CM1 & CM2 per Visitor**")
+        st.write(
+            f"- CM1 per Visitor needed to break even: **€{breakeven_cm1:.4f}**, "
+            f"actual: **€{actual_cm1:.4f}** (Δ {gap_cm1:+.4f})\n"
+            f"- CM2 per Visitor needed to break even: **€{breakeven_cm2:.4f}**, "
+            f"actual: **€{actual_cm2:.4f}** (Δ {gap_cm2:+.4f})"
+        )
+
 
     # render side‑by‑side
     col1, col2 = st.columns(2)
