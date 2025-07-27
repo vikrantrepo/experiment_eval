@@ -5,6 +5,6 @@ altair
 matplotlib
 scipy
 statsmodels
-pymc3
+pymc>=5.0
 arviz
 
