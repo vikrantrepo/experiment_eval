@@ -644,23 +644,31 @@ def main():
 
     delta_nspv = totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor']
     if delta_nspv < 0:
-        # Control (breakeven) values
-        breakeven_cm1 = totals_df.loc['Control','cm1_per_total_visitors']
-        breakeven_cm2 = totals_df.loc['Control','cm2_per_total_visitors']
-        # Test (actual) values
-        actual_cm1 = totals_df.loc['Test','cm1_per_total_visitors']
-        actual_cm2 = totals_df.loc['Test','cm2_per_total_visitors']
-        # Gaps
-        gap_cm1 = actual_cm1 - breakeven_cm1
-        gap_cm2 = actual_cm2 - breakeven_cm2
+        # control (baseline) values
+        ctrl_nspv    = totals_df.loc['Control','net_sales_per_visitor']
+        ctrl_cm1_vis = totals_df.loc['Control','cm1_per_total_visitors']
+        ctrl_cm2_vis = totals_df.loc['Control','cm2_per_total_visitors']
+        # test actual values
+        test_nspv    = totals_df.loc['Test','net_sales_per_visitor']
+        test_cm1_vis = totals_df.loc['Test','cm1_per_total_visitors']
+        test_cm2_vis = totals_df.loc['Test','cm2_per_total_visitors']
 
-        st.markdown("**⚖️ Breakeven vs. Actual CM1 & CM2 per Visitor**")
+        # ▶️ Compute the breakeven CMx per visitor needed at lower Test revenue
+        req_cm1_vis = test_nspv * (ctrl_cm1_vis / ctrl_nspv)
+        req_cm2_vis = test_nspv * (ctrl_cm2_vis / ctrl_nspv)
+
+        # gaps vs actual
+        gap_cm1 = test_cm1_vis - req_cm1_vis
+        gap_cm2 = test_cm2_vis - req_cm2_vis
+
+        st.markdown("**⚖️ True Breakeven vs. Actual CM1 & CM2 per Visitor**")
         st.write(
-            f"- CM1 per Visitor needed to break even: **€{breakeven_cm1:.4f}**, "
-            f"actual: **€{actual_cm1:.4f}** (Δ {gap_cm1:+.4f})\n"
-            f"- CM2 per Visitor needed to break even: **€{breakeven_cm2:.4f}**, "
-            f"actual: **€{actual_cm2:.4f}** (Δ {gap_cm2:+.4f})"
+            f"- CM1 per Visitor needed to break even: **€{req_cm1_vis:.4f}**, "
+            f"actual: **€{test_cm1_vis:.4f}** (Δ {gap_cm1:+.4f})\n"
+            f"- CM2 per Visitor needed to break even: **€{req_cm2_vis:.4f}**, "
+            f"actual: **€{test_cm2_vis:.4f}** (Δ {gap_cm2:+.4f})"
         )
+
 
 
     # render side‑by‑side
