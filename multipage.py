@@ -650,7 +650,7 @@ def main():
         f"**Conversion rate** changed by **{delta_cr:.2%} / {rel_cr:+.2f}%** "
         f"(C: {ctrl_cr:.2%}, T: {test_cr:.2%}) (p={p_z:.3f}, {sig_cr}), "
         f"**Orders per converter** changed by **{delta_opc:.4f} / {rel_opc:+.2f}%** "
-        f"(C: {ctrl_opc:.4f}, T: {test_op   c:.4f}) (p={p_o:.3f}, {sig_opc}), "
+        f"(C: {ctrl_opc:.4f}, T: {test_opc:.4f}) (p={p_o:.3f}, {sig_opc}), "
         f"**Net AOV** changed by **€{delta_aov:.2f} / {rel_aov:+.2f}%** "
         f"(C: €{ctrl_aov:.2f}, T: €{test_aov:.2f}) (p={p_a:.3f}, {sig_aov})."
     )
