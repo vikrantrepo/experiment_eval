@@ -500,7 +500,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def hurdle_studentt_diff(ctrl_vals, test_vals, draws=1000, tune=500):
+    def hurdle_studentt_diff(ctrl_vals, test_vals, draws=300, tune=200):
         ctrl = np.asarray(ctrl_vals)
         test = np.asarray(test_vals)
 
@@ -540,7 +540,7 @@ def main():
                 draws=draws,
                 tune=tune,
                 chains=2,
-                cores=1,
+                cores=2,
                 progressbar=True,
                 return_inferencedata=True
             )
