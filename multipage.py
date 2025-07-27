@@ -512,7 +512,6 @@ def main():
 
             pm.Normal("obs_c", mu=mu_c, sigma=sigma_c, observed=ctrl)
             pm.Normal("obs_t", mu=mu_t, sigma=sigma_t, observed=test)
-
             delta = pm.Deterministic("delta", mu_t - mu_c)
 
             trace = pm.sample(
@@ -524,10 +523,18 @@ def main():
                 return_inferencedata=True
             )
 
+        # Extract posterior samples
         posterior = trace.posterior["delta"].values.flatten()
         prob = (posterior > 0).mean()
-        hdi = az.hdi(posterior, hdi_prob=0.95)
-        return prob, float(hdi.sel(hdi="lower")), float(hdi.sel(hdi="higher"))
+
+        # Compute HDI from the flat array
+        hdi_bounds = az.hdi(posterior, hdi_prob=0.95)  # returns a 2‑element np.array
+        lower = float(hdi_bounds[0])
+        upper = float(hdi_bounds[1])
+
+        # **Return** numerical values directly—no .sel calls
+        return prob, lower, upper
+
 
     metrics = {
         'Revenue per Visitor':          'net_sales_per_visitor',
