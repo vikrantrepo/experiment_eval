@@ -596,7 +596,7 @@ def main():
             ctrl_series = np.full(1000, ctrl)
             test_series = np.full(1000, test)
 
-        p, lo, hi = pymc_diff(ctrl_series, test_series)
+        p, lo, hi = hurdle_studentt_diff(ctrl_series, test_series)
         # compute impact (integer)
         diff = test - ctrl
         if name == 'Revenue per Visitor':
