@@ -9,6 +9,9 @@ from statsmodels.stats.proportion import proportions_ztest
 from scipy.stats import norm
 import pymc as pm
 import arviz as az
+import pytensor
+
+pytensor.config.mode='NUMBA'
 
 
 st.set_page_config(page_title="SQL Builder & Experiment Dashboard", layout="wide")
