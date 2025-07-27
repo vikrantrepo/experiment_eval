@@ -642,32 +642,30 @@ def main():
     st.write(insight_bayesian)
 
 
-        # ── TRUE breakeven CM1/CM2 given Test RPV ──
-    # read control & test RPV and CMx per visitor
-    ctrl_nspv    = totals_df.loc['Control', 'net_sales_per_visitor']
-    ctrl_cm1_vis = totals_df.loc['Control', 'cm1_per_total_visitors']
-    ctrl_cm2_vis = totals_df.loc['Control', 'cm2_per_total_visitors']
+    ctrl_nspv = totals_df.loc['Control', 'net_sales_per_visitor']
+    test_nspv = totals_df.loc['Test',    'net_sales_per_visitor']
+    delta_nspv = test_nspv - ctrl_nspv
+    if delta_nspv < 0:
+        loss = -delta_nspv
 
-    test_nspv    = totals_df.loc['Test',    'net_sales_per_visitor']
-    test_cm1_vis = totals_df.loc['Test',    'cm1_per_total_visitors']
-    test_cm2_vis = totals_df.loc['Test',    'cm2_per_total_visitors']
+        # 2) required full‐offset CMx
+        ctrl_cm1 = totals_df.loc['Control', 'cm1_per_total_visitors']
+        ctrl_cm2 = totals_df.loc['Control', 'cm2_per_total_visitors']
+        req_cm1 = ctrl_cm1 + loss
+        req_cm2 = ctrl_cm2 + loss
 
-    # only do this when Test RPV < Control RPV
-    if test_nspv < ctrl_nspv:
-        # required breakeven CMx per visitor on Test RPV:
-        req_cm1_vis = test_nspv * (ctrl_cm1_vis / ctrl_nspv)
-        req_cm2_vis = test_nspv * (ctrl_cm2_vis / ctrl_nspv)
+        # 3) actual Test CMx
+        test_cm1 = totals_df.loc['Test', 'cm1_per_total_visitors']
+        test_cm2 = totals_df.loc['Test', 'cm2_per_total_visitors']
+        gap_cm1 = test_cm1 - req_cm1
+        gap_cm2 = test_cm2 - req_cm2
 
-        # gaps vs actual Test CMx
-        gap_cm1 = test_cm1_vis - req_cm1_vis
-        gap_cm2 = test_cm2_vis - req_cm2_vis
-
-        st.markdown("**⚖️ Breakeven CM1 & CM2 per Visitor (accounting for Test RPV)**")
+        st.markdown("**💡 Full‐offset breakeven CM1 & CM2 per Visitor**")
         st.write(
-            f"- You’d need **€{req_cm1_vis:.4f} CM1/visitor** to breakeven on a Test RPV of €{test_nspv:.4f}; "
-            f"actual: **€{test_cm1_vis:.4f}** (Δ {gap_cm1:+.4f})\n"
-            f"- You’d need **€{req_cm2_vis:.4f} CM2/visitor** to breakeven on a Test RPV of €{test_nspv:.4f}; "
-            f"actual: **€{test_cm2_vis:.4f}** (Δ {gap_cm2:+.4f})"
+            f"- To fully offset the €{loss:.4f} RPV loss, you’d need CM1 ≥ **€{req_cm1:.4f}**; "
+            f"actual: **€{test_cm1:.4f}** (Δ {gap_cm1:+.4f})\n"
+            f"- To fully offset the €{loss:.4f} RPV loss, you’d need CM2 ≥ **€{req_cm2:.4f}**; "
+            f"actual: **€{test_cm2:.4f}** (Δ {gap_cm2:+.4f})"
         )
 
 
