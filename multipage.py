@@ -11,7 +11,7 @@ import pymc as pm
 import arviz as az
 import pytensor
 
-pytensor.config.mode='NUMBA'
+pytensor.config.mode = 'JAX'
 
 
 st.set_page_config(page_title="SQL Builder & Experiment Dashboard", layout="wide")
