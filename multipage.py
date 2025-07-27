@@ -526,10 +526,8 @@ def main():
 
         posterior = trace.posterior["delta"].values.flatten()
         prob = (posterior > 0).mean()
-        hdi = az.hdi(posterior, hdi_prob=0.95)  # returns an array [lower, upper]
-        lower, upper = hdi[0], hdi[1]
-
-    	return prob, lower, upper
+        hdi = az.hdi(posterior, hdi_prob=0.95)
+        return prob, float(hdi.sel(hdi="lower")), float(hdi.sel(hdi="higher"))
 
     metrics = {
         'Revenue per Visitor':          'net_sales_per_visitor',
