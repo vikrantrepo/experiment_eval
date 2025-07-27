@@ -7,5 +7,3 @@ scipy
 statsmodels
 pymc>=5.0
 arviz
-pytensor
-
