@@ -529,7 +529,7 @@ def main():
         hdi = az.hdi(posterior, hdi_prob=0.95)  # returns an array [lower, upper]
         lower, upper = hdi[0], hdi[1]
 
-    return prob, lower, upper
+    	return prob, lower, upper
 
     metrics = {
         'Revenue per Visitor':          'net_sales_per_visitor',
