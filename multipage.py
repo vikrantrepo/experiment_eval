@@ -417,7 +417,7 @@ def main():
     diff = pd.Series(index=totals_df.columns, name='Ab. Delta')
     cr_test = totals_df.loc['Test', 'conversion_rate']
     cr_ctrl = totals_df.loc['Control', 'conversion_rate']	
-    diff['conversion_rate'] = f"{int(round((cr_test - cr_ctrl) * 10000, 0))} bps"
+    diff['conversion_rate'] = (cr_test - cr_ctrl) * 10000,
     diff['net_aov'] = round(totals_df.loc['Test','net_aov'] - totals_df.loc['Control','net_aov'], 4)
     diff['orders_per_converting_visitor'] = round(totals_df.loc['Test','orders_per_converting_visitor'] - totals_df.loc['Control','orders_per_converting_visitor'], 4)
     diff['net_sales_per_visitor'] = round(totals_df.loc['Test','net_sales_per_visitor'] - totals_df.loc['Control','net_sales_per_visitor'], 4)
@@ -452,7 +452,7 @@ def main():
         'orders_all': '{:,.0f}',
         'orders_L': '{:,.0f}',
         'total_net_sales': '€{:,.0f}',
-        'conversion_rate': lambda v: f"{v:.2%}" if isinstance(v, (int, float, np.floating)) else v,
+        'conversion_rate': lambda v: f"{v:.0f} bps" if isinstance(v, (int, float, np.floating)) else v,
         'net_aov': lambda v: f"€{v:.2f}",
         'orders_per_converting_visitor': '{:.4f}',
         'share_of_cancelled_orders': '{:.2%}',
@@ -544,7 +544,7 @@ def main():
                 tune=tune,
                 chains=2,
                 cores=1,
-                progressbar=False,
+                progressbar=True,
                 return_inferencedata=True
             )
 
@@ -650,7 +650,7 @@ def main():
         f"**Conversion rate** changed by **{delta_cr:.2%} / {rel_cr:+.2f}%** "
         f"(C: {ctrl_cr:.2%}, T: {test_cr:.2%}) (p={p_z:.3f}, {sig_cr}), "
         f"**Orders per converter** changed by **{delta_opc:.4f} / {rel_opc:+.2f}%** "
-        f"(C: {ctrl_opc:.4f}, T: {test_opc:.4f}) (p={p_o:.3f}, {sig_opc}), "
+        f"(C: {ctrl_opc:.4f}, T: {test_op   c:.4f}) (p={p_o:.3f}, {sig_opc}), "
         f"**Net AOV** changed by **€{delta_aov:.2f} / {rel_aov:+.2f}%** "
         f"(C: €{ctrl_aov:.2f}, T: €{test_aov:.2f}) (p={p_a:.3f}, {sig_aov})."
     )
