@@ -282,7 +282,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     })
 
 # -------------------- STATISTICAL TESTS --------------------
-def bootstrap_rpev(df: pd.DataFrame, n_iters=1000):
+def bootstrap_rpev(df: pd.DataFrame, n_iters=12000):
     visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
     test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
     ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
@@ -497,7 +497,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=1000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=12000, cred_mass=0.95):
         rng = np.random.default_rng()
         diffs = []
         for _ in range(n_iters):
@@ -724,11 +724,11 @@ def main():
             q3 = quartiles.loc[bucket, 0.75]
 
             # shift text slightly to the right so it doesn’t overlap the box
-            x_text = i + 0.05
+            x_text = i + 0.07
 
-            ax2.text(x_text, q1, f"Q1: {q1:.2f}", va='center', fontsize=8)
-            ax2.text(x_text, med, f"Med: {med:.2f}", va='center', fontsize=8)
-            ax2.text(x_text, q3, f"Q3: {q3:.2f}", va='center', fontsize=8)
+            ax2.text(x_text, q1, f"Q1: {q1:.2f}", va='center', fontsize=6)
+            ax2.text(x_text, med, f"Med: {med:.2f}", va='center', fontsize=6)
+            ax2.text(x_text, q3, f"Q3: {q3:.2f}", va='center', fontsize=6)
 
         st.pyplot(fig2)
 
