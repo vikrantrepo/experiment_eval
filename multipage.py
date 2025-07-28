@@ -11,7 +11,7 @@ from scipy.stats import norm
 st.set_page_config(page_title="SQL Builder & Experiment Dashboard", layout="wide")
 st.title("🛠️ SQL Builder & 📊 Experiment Dashboard")
 
-tab1, tab2, tab3 = st.tabs(["SQL Query Builder", "Experiment Dashboard", "Documentation"])F
+tab1, tab2, tab3 = st.tabs(["SQL Query Builder", "Experiment Dashboard", "Documentation"])
 
 # --------------- TAB 1: SQL QUERY BUILDER ---------------
 with tab1:
