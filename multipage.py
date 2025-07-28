@@ -282,7 +282,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     })
 
 # -------------------- STATISTICAL TESTS --------------------
-def bootstrap_rpev(df: pd.DataFrame, n_iters=12000):
+def bootstrap_rpev(df: pd.DataFrame, n_iters=1000):
     visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
     test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
     ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
@@ -497,7 +497,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=12000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=1000, cred_mass=0.95):
         rng = np.random.default_rng()
         diffs = []
         for _ in range(n_iters):
@@ -698,14 +698,40 @@ def main():
         ax1.axvline(ci_boot[1], linestyle=':')
         ax1.set_title('Bootstrap Distribution')
         st.pyplot(fig1)
+    
     with col2:
         fig2, ax2 = plt.subplots(figsize=(4, 3))
+
+        # draw the boxplot
         visitor_stats.boxplot(column='net_aov', by='buckets', ax=ax2)
         ax2.set_title('Net AOV by Bucket')
         ax2.set_xlabel('')
         ax2.set_ylabel('Net AOV')
-        plt.suptitle('')
+        plt.suptitle('')  # remove the automatic “by buckets” suptitle
+
+        # compute quartiles per bucket
+        quartiles = (
+            visitor_stats
+            .groupby('buckets')['net_aov']
+            .quantile([0.25, 0.5, 0.75])
+            .unstack(level=-1)    # columns will be [0.25, 0.5, 0.75]
+        )
+
+        # annotate each bucket: x positions are 1, 2, … by default
+        for i, bucket in enumerate(quartiles.index, start=1):
+            q1 = quartiles.loc[bucket, 0.25]
+            med = quartiles.loc[bucket, 0.5]
+            q3 = quartiles.loc[bucket, 0.75]
+
+            # shift text slightly to the right so it doesn’t overlap the box
+            x_text = i + 0.05
+
+            ax2.text(x_text, q1, f"Q1: {q1:.2f}", va='center', fontsize=8)
+            ax2.text(x_text, med, f"Med: {med:.2f}", va='center', fontsize=8)
+            ax2.text(x_text, q3, f"Q3: {q3:.2f}", va='center', fontsize=8)
+
         st.pyplot(fig2)
+
     with col3:
         fig3, ax3 = plt.subplots(figsize=(4, 3))
         visitor_stats.boxplot(column='order_count', by='buckets', ax=ax3)
