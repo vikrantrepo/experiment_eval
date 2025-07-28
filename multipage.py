@@ -724,7 +724,7 @@ def main():
             q3 = quartiles.loc[bucket, 0.75]
 
             # shift text slightly to the right so it doesn’t overlap the box
-            x_text = i + 0.07
+            x_text = i + 0.1
 
             ax2.text(x_text, q1, f"Q1: {q1:.2f}", va='center', fontsize=6)
             ax2.text(x_text, med, f"Med: {med:.2f}", va='center', fontsize=6)
