@@ -282,7 +282,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     })
 
 # -------------------- STATISTICAL TESTS --------------------
-def bootstrap_rpev(df: pd.DataFrame, n_iters=15000):
+def bootstrap_rpev(df: pd.DataFrame, n_iters=12000):
     visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
     test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
     ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
@@ -497,7 +497,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=15000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=12000, cred_mass=0.95):
         rng = np.random.default_rng()
         diffs = []
         for _ in range(n_iters):
@@ -673,10 +673,10 @@ def main():
     # render side‑by‑side
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("🔬 Frequentist Tests")
+        st.subheader("🔬 Frequentist Tests : NS/ exposed visitor and respective components")
         st.table(stats_summary.set_index('Test'))
     with col2:
-        st.subheader("🔭 Bayesian Analysis")
+        st.subheader("🔭 Bayesian Analysis : Probability on Net sales and Margins")
         st.table(bayes_summary)
 
     # ────────────────────────────────────────────────────────────────────────
