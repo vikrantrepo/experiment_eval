@@ -273,12 +273,25 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     df['orders_per_converter_rel_diff'] = ((df['orders_per_converting_visitor_Test'] - df['orders_per_converting_visitor_Control']) / df['orders_per_converting_visitor_Control']).replace([np.inf, -np.inf], np.nan)
     df['net_sales_per_visitor_abs_diff'] = df['net_sales_per_visitor_Test'] - df['net_sales_per_visitor_Control']
     df['net_sales_per_visitor_rel_diff'] = (df['net_sales_per_visitor_abs_diff'] / df['net_sales_per_visitor_Control']).replace([np.inf, -np.inf], np.nan)
+    # ─── NEW: CM1/CM2 differences ───────────────────────────────────────────────
+    # absolute difference in CM1/CM2 per visitor
+    df['cm1_per_total_visitors_abs_diff']    = df['cm1_per_total_visitors_Test'] - df['cm1_per_total_visitors_Control']
+    df['cm2_per_total_visitors_abs_diff']    = df['cm2_per_total_visitors_Test'] - df['cm2_per_total_visitors_Control']
+    # absolute difference in CM1/CM2 share of net sales
+    df['cm1_per_total_net_sales_abs_diff']   = df['cm1_per_total_net_sales_Test'] - df['cm1_per_total_net_sales_Control']
+    df['cm2_per_total_net_sales_abs_diff']   = df['cm2_per_total_net_sales_Test'] - df['cm2_per_total_net_sales_Control']
+
+    # rounding
     return df.round({
-        'conversion_rate_diff_bps': 0,
-        'net_aov_rel_diff': 4,
-        'orders_per_converter_rel_diff': 4,
-        'net_sales_per_visitor_abs_diff': 4,
-        'net_sales_per_visitor_rel_diff': 4
+        'conversion_rate_diff_bps':              0,
+        'net_aov_rel_diff':                      4,
+        'orders_per_converter_rel_diff':         4,
+        'net_sales_per_visitor_abs_diff':        4,
+        'net_sales_per_visitor_rel_diff':        4,
+        'cm1_per_total_visitors_abs_diff':       4,
+        'cm2_per_total_visitors_abs_diff':       4,
+        'cm1_per_total_net_sales_abs_diff':      4,
+        'cm2_per_total_net_sales_abs_diff':      4,
     })
 
 # -------------------- STATISTICAL TESTS --------------------
