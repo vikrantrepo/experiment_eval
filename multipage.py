@@ -497,7 +497,7 @@ def main():
 
     # ─── BAYESIAN ANALYSIS ──────────────────────────────────────────────────
 
-    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=12000, cred_mass=0.95):
+    def bayesian_bootstrap_diff(ctrl_vals, test_vals, n_iters=10000, cred_mass=0.95):
         rng = np.random.default_rng()
         diffs = []
         for _ in range(n_iters):
