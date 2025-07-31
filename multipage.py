@@ -282,7 +282,7 @@ def pivot_metrics(metrics_df: pd.DataFrame, index_col: str) -> pd.DataFrame:
     })
 
 # -------------------- STATISTICAL TESTS --------------------
-def bootstrap_rpev(df: pd.DataFrame, n_iters=12000):
+def bootstrap_rpev(df: pd.DataFrame, n_iters=1000):
     visitor_sales = df.groupby(['buckets', 'exposed_visitor_id'], as_index=False)['net_sales'].sum()
     test = visitor_sales.loc[visitor_sales.buckets == 'Test', 'net_sales'].values
     ctrl = visitor_sales.loc[visitor_sales.buckets == 'Control', 'net_sales'].values
